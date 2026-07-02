@@ -14,13 +14,6 @@ OUTPUT_FILE = "Supplier_Performance_Report.xlsx"
 MASTER_SHEET = "Master Summary"
 
 # =============================================================================
-# DELIVERY SETTINGS
-# =============================================================================
-
-# Delivery is considered late if it exceeds this number of days
-LATE_DELIVERY_DAYS = 3
-
-# =============================================================================
 # EXCEL SETTINGS
 # =============================================================================
 
@@ -29,16 +22,15 @@ HEADER_ROW_HEIGHT = 22
 DEFAULT_ROW_HEIGHT = 18
 
 # =============================================================================
-# SHEET COLOURS
+# REPORT FORMATTING
 # =============================================================================
 
-HEADER_FILL = "1F4E78"       # Dark Blue
-HEADER_FONT = "FFFFFF"       # White
-TOTAL_FILL = "D9EAD3"        # Light Green
+HEADER_FILL = "1F4E78"      # Dark Blue
+HEADER_FONT = "FFFFFF"      # White
+TOTAL_FILL = "D9EAD3"       # Light Green
 
 # =============================================================================
-# PURCHASE REGISTER
-# Columns required from Purchase Register
+# REQUIRED COLUMNS - PURCHASE REGISTER
 # =============================================================================
 
 REGISTER_REQUIRED_COLUMNS = [
@@ -47,11 +39,11 @@ REGISTER_REQUIRED_COLUMNS = [
 ]
 
 # =============================================================================
-# RECEIVING REPORT
-# Columns to retain after cleaning
+# REQUIRED COLUMNS - PURCHASE RECEIVING DEVIATION
+# (Columns expected in the uploaded report)
 # =============================================================================
 
-RECEIVING_KEEP_COLUMNS = [
+RECEIVING_INPUT_COLUMNS = [
 
     "Supplier",
     "Article",
@@ -69,6 +61,32 @@ RECEIVING_KEEP_COLUMNS = [
 ]
 
 # =============================================================================
+# FINAL REPORT COLUMNS
+# (Columns that will appear in every supplier worksheet)
+# =============================================================================
+
+REPORT_COLUMNS = [
+
+    "Supplier",
+    "Article",
+    "Order No.",
+    "Order Date",
+    "Delivery Date",
+    "Delivery Days",
+
+    "Ordered",
+    "Order Unit",
+    "Booked QTY",
+    "Variance QTY",
+
+    "PO Price",
+    "Booked Price",
+    "Variance Price",
+    "Variance Value"
+
+]
+
+# =============================================================================
 # MASTER SUMMARY COLUMNS
 # =============================================================================
 
@@ -78,11 +96,10 @@ SUMMARY_COLUMNS = [
     "Orders",
     "Ordered Qty",
     "Received Qty",
-    "Delivery %",
+    "Fill Rate %",
     "Qty Variance",
     "Price Variance",
-    "Average Delivery Days",
-    "Supplier Score"
+    "Average Delivery Days"
 
 ]
 
@@ -118,8 +135,7 @@ EXCLUDED_SUPPLIERS = {
 }
 
 # =============================================================================
-# REQUIRED COLUMNS IN INPUT FILES
-# Used to validate uploaded files
+# REQUIRED COLUMNS FOR VALIDATION
 # =============================================================================
 
 PURCHASE_REGISTER_COLUMNS = {
@@ -134,6 +150,7 @@ PURCHASE_RECEIVING_COLUMNS = {
     "Supplier",
     "Article",
     "Ordered",
+    "Order Unit",
     "Booked QTY",
     "Variance QTY",
     "PO Price",
