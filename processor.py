@@ -1,65 +1,101 @@
 """
 processor.py
-Section 1
--------------------------------
-Imports
-Validation
-Reading Excel Files
-Cleaning Data
-Merging Data
-Calculating Delivery Days
+Supplier Performance Report Tool
+Part 1
+---------------------------------
+• Imports
+• Validation
+• Reading Excel files
+• Cleaning data
+• Merge Purchase Register & Receiving Report
+• Delivery Days calculation
 """
+from pathlib import Path
 
 import pandas as pd
-from pathlib import Path
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.utils import get_column_letter
-from openpyxl.chart import BarChart, Reference
 
-from config import (
-    REPORT_COLUMNS,
-    REGISTER_REQUIRED_COLUMNS,
-    PURCHASE_REGISTER_COLUMNS,
-    PURCHASE_RECEIVING_COLUMNS,
-    EXCLUDED_SUPPLIERS,
-    SUMMARY_COLUMNS,
-    REPORT_TITLE,
-    MASTER_SHEET,
-    OUTPUT_FILE,
-    HEADER_FILL,
-    HEADER_FONT,
-    TOTAL_FILL,
-    FREEZE_PANES,
-    HEADER_ROW_HEIGHT,
-    DEFAULT_ROW_HEIGHT,
+from openpyxl import Workbook
+from openpyxl.styles import (
+    Font,
+    PatternFill,
+    Alignment,
+    Border,
+    Side
 )
 
-###############################################################################
-# Helper Functions
-###############################################################################
+from openpyxl.utils import get_column_letter
 
-def validate_columns(df: pd.DataFrame, required_columns: set, file_name: str):
+from openpyxl.chart import (
+    BarChart,
+    PieChart,
+    Reference
+)
+
+from openpyxl.chart.label import DataLabelList
+
+from openpyxl.formatting.rule import (
+    ColorScaleRule
+)
+
+from config import (
+
+    REPORT_COLUMNS,
+
+    REGISTER_REQUIRED_COLUMNS,
+
+    RECEIVING_INPUT_COLUMNS,
+
+    PURCHASE_REGISTER_COLUMNS,
+
+    PURCHASE_RECEIVING_COLUMNS,
+
+    EXCLUDED_SUPPLIERS,
+
+    REPORT_TITLE,
+
+    MASTER_SHEET,
+
+    OUTPUT_FILE,
+
+    HEADER_FILL,
+
+    HEADER_FONT,
+
+    TOTAL_FILL,
+
+    FREEZE_PANES,
+
+    HEADER_ROW_HEIGHT,
+
+    DEFAULT_ROW_HEIGHT
+
+)
+
+
+# =============================================================================
+# VALIDATION
+# =============================================================================
+
+def validate_columns(df: pd.DataFrame, required: set, file_name: str):
     """
     Validate uploaded workbook columns.
-    Raises ValueError if any required column is missing.
     """
 
-    missing = required_columns.difference(df.columns)
+    missing = required - set(df.columns)
 
     if missing:
         raise ValueError(
-            f"\n{file_name}\n"
+            f"\n{file_name}\n\n"
             f"Missing columns:\n"
             f"{', '.join(sorted(missing))}"
         )
 
 
-###############################################################################
-# Read Excel Files
-###############################################################################
+# =============================================================================
+# READ PURCHASE REGISTER
+# =============================================================================
 
-def read_purchase_register(file_path):
+def read_purchase_register(file_path: str | Path) -> pd.DataFrame:
     """
     Read Purchase Register workbook.
     """
@@ -88,9 +124,13 @@ def read_purchase_register(file_path):
     return df
 
 
-def read_receiving_report(file_path):
+# =============================================================================
+# READ RECEIVING REPORT
+# =============================================================================
+
+def read_receiving_report(file_path: str | Path) -> pd.DataFrame:
     """
-    Read Purchase Receiving Deviation workbook.
+    Read Purchase Receiving Deviation report.
     """
 
     df = pd.read_excel(file_path)
@@ -104,43 +144,28 @@ def read_receiving_report(file_path):
     return df
 
 
-###############################################################################
-# Cleaning
-###############################################################################
+# =============================================================================
+# CLEAN RECEIVING DATA
+# =============================================================================
 
-def clean_receiving_data(df):
+def clean_receiving_data(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Keep required columns only.
+    Keep required columns and convert datatypes.
     """
 
-    keep = [
-
-        "Supplier",
-        "Article",
-        "Order No.",
-        "Ordered",
-        "Order Unit",
-        "Booked QTY",
-        "Variance QTY",
-        "PO Price",
-        "Booked Price",
-        "Variance Price",
-        "Variance Value",
-        "Delivery Date"
-
-    ]
-
-    df = df[keep].copy()
+    df = df[RECEIVING_INPUT_COLUMNS].copy()
 
     df["Supplier"] = (
         df["Supplier"]
         .fillna("")
         .astype(str)
+        .str.upper()
         .str.strip()
     )
 
     df["Order No."] = (
         df["Order No."]
+        .fillna("")
         .astype(str)
         .str.strip()
     )
@@ -172,93 +197,83 @@ def clean_receiving_data(df):
     return df
 
 
-###############################################################################
-# Remove Excluded Suppliers
-###############################################################################
+# =============================================================================
+# REMOVE EXCLUDED SUPPLIERS
+# =============================================================================
 
-def remove_excluded_suppliers(df):
+def remove_excluded_suppliers(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Remove suppliers defined in config.py
+    Remove suppliers defined in config.py.
     """
-
-    df["Supplier"] = (
-        df["Supplier"]
-        .str.upper()
-        .str.strip()
-    )
 
     return df[
         ~df["Supplier"].isin(EXCLUDED_SUPPLIERS)
     ].copy()
 
 
-###############################################################################
-# Merge Purchase Register
-###############################################################################
+# =============================================================================
+# MERGE ORDER DATES
+# =============================================================================
 
-def merge_order_dates(receiving_df, register_df):
+def merge_order_dates(
+    receiving_df: pd.DataFrame,
+    register_df: pd.DataFrame
+) -> pd.DataFrame:
     """
-    Bring Order Date into receiving report
-    using Order Number.
+    Merge Order Date into receiving report.
     """
 
-    merged = receiving_df.merge(
-
+    return receiving_df.merge(
         register_df,
-
-        on="Order No.",
-
-        how="left"
-
+        how="left",
+        on="Order No."
     )
 
-    return merged
 
+# =============================================================================
+# CALCULATE DELIVERY DAYS
+# =============================================================================
 
-###############################################################################
-# Delivery Days KPI
-###############################################################################
-
-def calculate_delivery_days(df):
+def calculate_delivery_days(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Delivery Days =
-    Delivery Date - Order Date
+    Delivery Days = Delivery Date - Order Date
     """
 
     df["Delivery Days"] = (
-
         df["Delivery Date"] -
-
         df["Order Date"]
-
     ).dt.days
 
     return df
 
 
-###############################################################################
-# Final Report Dataset
-###############################################################################
+# =============================================================================
+# PREPARE REPORT DATASET
+# =============================================================================
 
-def prepare_report_data(register_file, receiving_file):
+def prepare_report_data(
+    purchase_register_file: str | Path,
+    receiving_report_file: str | Path
+) -> pd.DataFrame:
     """
     Complete preprocessing pipeline.
     """
 
-    register = read_purchase_register(register_file)
+    register = read_purchase_register(
+        purchase_register_file
+    )
 
-    receiving = read_receiving_report(receiving_file)
+    receiving = read_receiving_report(
+        receiving_report_file
+    )
 
     receiving = clean_receiving_data(receiving)
 
     receiving = remove_excluded_suppliers(receiving)
 
     merged = merge_order_dates(
-
         receiving,
-
         register
-
     )
 
     merged = calculate_delivery_days(merged)
@@ -266,59 +281,61 @@ def prepare_report_data(register_file, receiving_file):
     merged = merged[REPORT_COLUMNS]
 
     merged.sort_values(
-
-        by=[
-
-            "Supplier",
-
-            "Order Date"
-
-        ],
-
+        ["Supplier", "Order Date", "Order No."],
         inplace=True
-
     )
 
     merged.reset_index(
-
         drop=True,
-
         inplace=True
-
     )
 
-    return merged
+    return merged  
 
-###############################################################################
-# KPI CALCULATIONS
-###############################################################################
+# =============================================================================
+# MASTER SUMMARY KPI CALCULATIONS
+# =============================================================================
 
-def create_master_summary(df):
+def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Generate supplier KPI summary.
+    Create supplier performance summary.
     """
 
     summary = (
         df.groupby("Supplier", as_index=False)
-          .agg(
-              Orders=("Order No.", "nunique"),
-              Ordered_Qty=("Ordered", "sum"),
-              Received_Qty=("Booked QTY", "sum"),
-              Qty_Variance=("Variance QTY", "sum"),
-              Price_Variance=("Variance Value", "sum"),
-              Average_Delivery_Days=("Delivery Days", "mean")
-          )
+        .agg(
+            Orders=("Order No.", "nunique"),
+            Ordered_Qty=("Ordered", "sum"),
+            Received_Qty=("Booked QTY", "sum"),
+            Qty_Variance=("Variance QTY", "sum"),
+            Price_Variance=("Variance Value", "sum"),
+            Average_Delivery_Days=("Delivery Days", "mean")
+        )
     )
 
-    # Fill Rate %
-
     summary["Fill Rate %"] = (
-        summary["Received_Qty"] /
-        summary["Ordered_Qty"]
-    ).replace([float("inf")], 0).fillna(0) * 100
+        (
+            summary["Received_Qty"] /
+            summary["Ordered_Qty"]
+        )
+        .replace([float("inf")], 0)
+        .fillna(0)
+        * 100
+    )
 
-    summary["Average_Delivery_Days"] = (
-        summary["Average_Delivery_Days"]
+    summary.rename(
+        columns={
+            "Ordered_Qty": "Ordered Qty",
+            "Received_Qty": "Received Qty",
+            "Qty_Variance": "Qty Variance",
+            "Price_Variance": "Price Variance",
+            "Average_Delivery_Days": "Average Delivery Days",
+        },
+        inplace=True,
+    )
+
+    summary["Average Delivery Days"] = (
+        summary["Average Delivery Days"]
         .round(1)
     )
 
@@ -327,61 +344,74 @@ def create_master_summary(df):
         .round(2)
     )
 
-    summary.rename(
-        columns={
-
-            "Ordered_Qty": "Ordered Qty",
-
-            "Received_Qty": "Received Qty",
-
-            "Qty_Variance": "Qty Variance",
-
-            "Price_Variance": "Price Variance",
-
-            "Average_Delivery_Days": "Average Delivery Days"
-
-        },
-
-        inplace=True
-
-    )
-
     summary.sort_values(
-
         by=[
-
             "Fill Rate %",
             "Average Delivery Days"
-
         ],
-
-        ascending=[False, True],
-
+        ascending=[
+            False,
+            True
+        ],
         inplace=True
-
     )
 
-    summary.reset_index(
+    return summary.reset_index(drop=True)
 
-        drop=True,
 
-        inplace=True
+# =============================================================================
+# EXECUTIVE SUMMARY
+# =============================================================================
 
+def create_executive_summary(df: pd.DataFrame) -> dict:
+    """
+    Dashboard KPI cards.
+    """
+
+    ordered = df["Ordered"].sum()
+    received = df["Booked QTY"].sum()
+
+    fill_rate = (
+        (received / ordered) * 100
+        if ordered else 0
     )
 
-    return summary
+    return {
+
+        "Total Suppliers":
+            df["Supplier"].nunique(),
+
+        "Total Orders":
+            df["Order No."].nunique(),
+
+        "Total Ordered Qty":
+            ordered,
+
+        "Total Received Qty":
+            received,
+
+        "Overall Fill Rate":
+            round(fill_rate, 2),
+
+        "Average Delivery Days":
+            round(df["Delivery Days"].mean(), 1),
+
+        "Total Price Variance":
+            df["Variance Value"].sum(),
+
+        "Total Quantity Variance":
+            df["Variance QTY"].sum()
+
+    }
 
 
-###############################################################################
-# MASTER SUMMARY WORKSHEET
-###############################################################################
+# =============================================================================
+# MASTER SUMMARY SHEET
+# =============================================================================
 
 def write_master_summary(workbook, summary_df):
-    """
-    Create the dashboard worksheet.
-    """
 
-    ws = workbook.create_sheet(MASTER_SHEET)
+    ws = workbook.create_sheet("Master Summary")
 
     ws.append(summary_df.columns.tolist())
 
@@ -392,94 +422,515 @@ def write_master_summary(workbook, summary_df):
     return ws
 
 
-###############################################################################
+# =============================================================================
+# SUPPLIER KPI PANEL
+# =============================================================================
+
+def supplier_kpis(df: pd.DataFrame):
+
+    ordered = df["Ordered"].sum()
+    received = df["Booked QTY"].sum()
+
+    fill_rate = (
+        (received / ordered) * 100
+        if ordered else 0
+    )
+
+    return [
+
+        ("Orders", df["Order No."].nunique()),
+
+        ("Ordered Qty", ordered),
+
+        ("Received Qty", received),
+
+        ("Fill Rate %", round(fill_rate, 2)),
+
+        ("Quantity Variance", df["Variance QTY"].sum()),
+
+        ("Price Variance", df["Variance Value"].sum()),
+
+        (
+            "Average Delivery Days",
+            round(df["Delivery Days"].mean(), 1)
+        )
+
+    ]
+
+
+# =============================================================================
 # SUPPLIER WORKSHEETS
-###############################################################################
+# =============================================================================
 
-def create_supplier_sheets(workbook, df):
-    """
-    One worksheet per supplier.
-    """
-
-    supplier_sheets = {}
+def create_supplier_sheets(workbook, report_df):
 
     suppliers = sorted(
-
-        df["Supplier"].unique()
-
+        report_df["Supplier"].unique()
     )
 
     for supplier in suppliers:
 
-        sheet_name = supplier[:31]
-
-        ws = workbook.create_sheet(sheet_name)
+        sheet = workbook.create_sheet(
+            supplier[:31]
+        )
 
         supplier_df = (
-
-            df[df["Supplier"] == supplier]
-
+            report_df[
+                report_df["Supplier"] == supplier
+            ]
             .sort_values(
-
-                by=[
-
+                [
                     "Order Date",
-
                     "Order No."
-
                 ]
+            )
+        )
+
+        # -----------------------------
+        # Transaction Table
+        # -----------------------------
+
+        sheet.append(
+            supplier_df.columns.tolist()
+        )
+
+        for row in supplier_df.itertuples(index=False):
+
+            sheet.append(list(row))
+
+        # -----------------------------
+        # KPI PANEL
+        # -----------------------------
+
+        start_row = sheet.max_row + 3
+
+        sheet.cell(
+            start_row,
+            1,
+            "Supplier KPI Summary"
+        )
+
+        kpis = supplier_kpis(
+            supplier_df
+        )
+
+        for i, (kpi, value) in enumerate(
+            kpis,
+            start=start_row + 1
+        ):
+
+            sheet.cell(i, 1).value = kpi
+            sheet.cell(i, 2).value = value
+
+
+# =============================================================================
+# BUILD WORKBOOK
+# =============================================================================
+
+def build_workbook(report_df):
+
+    wb = Workbook()
+
+    wb.remove(wb.active)
+
+    summary = create_master_summary(
+        report_df
+    )
+
+    write_master_summary(
+        wb,
+        summary
+    )
+
+    create_supplier_sheets(
+        wb,
+        report_df
+    )
+
+    return wb 
+
+###############################################################################
+# EXCEL FORMATTING PART 3
+###############################################################################
+
+def format_worksheet(ws):
+    """
+    Apply professional formatting.
+    """
+
+    header_fill = PatternFill(
+        fill_type="solid",
+        fgColor=HEADER_FILL
+    )
+
+    header_font = Font(
+        bold=True,
+        color=HEADER_FONT
+    )
+
+    thin = Side(style="thin")
+
+    border = Border(
+
+        left=thin,
+
+        right=thin,
+
+        top=thin,
+
+        bottom=thin
+
+    )
+
+    ws.freeze_panes = FREEZE_PANES
+
+    ws.auto_filter.ref = ws.dimensions
+
+    ws.row_dimensions[1].height = HEADER_ROW_HEIGHT
+
+    for cell in ws[1]:
+
+        cell.fill = header_fill
+
+        cell.font = header_font
+
+        cell.alignment = Alignment(
+
+            horizontal="center",
+
+            vertical="center"
+
+        )
+
+        cell.border = border
+
+    for row in ws.iter_rows(min_row=2):
+
+        ws.row_dimensions[row[0].row].height = DEFAULT_ROW_HEIGHT
+
+        for cell in row:
+
+            cell.border = border
+
+            if "Date" in str(ws.cell(1, cell.column).value):
+
+                cell.number_format = "dd-mmm-yyyy"
+
+            elif "%" in str(ws.cell(1, cell.column).value):
+
+                cell.number_format = '0.00%'
+
+            elif isinstance(cell.value, (int, float)):
+
+                cell.number_format = '#,##0.00'
+
+    for column in ws.columns:
+
+        length = max(
+
+            len(str(c.value))
+
+            if c.value is not None else 0
+
+            for c in column
+
+        )
+
+        ws.column_dimensions[
+
+            get_column_letter(column[0].column)
+
+        ].width = min(length + 3, 40)
+
+
+###############################################################################
+# CONDITIONAL FORMATTING
+###############################################################################
+
+def apply_conditional_formatting(ws):
+
+    headers = {
+
+        cell.value: cell.column
+
+        for cell in ws[1]
+
+    }
+
+    if "Delivery Days" in headers:
+
+        col = get_column_letter(
+
+            headers["Delivery Days"]
+
+        )
+
+        ws.conditional_formatting.add(
+
+            f"{col}2:{col}{ws.max_row}",
+
+            ColorScaleRule(
+
+                start_type="min",
+
+                start_color="63BE7B",
+
+                mid_type="percentile",
+
+                mid_value=50,
+
+                mid_color="FFEB84",
+
+                end_type="max",
+
+                end_color="F8696B"
 
             )
 
         )
 
-        ws.append(
 
-            supplier_df.columns.tolist()
+###############################################################################
+# CHARTS
+###############################################################################
+
+def add_supplier_chart(ws):
+
+    headers = {
+
+        cell.value: cell.column
+
+        for cell in ws[1]
+
+    }
+
+    if not {
+
+        "Ordered",
+
+        "Booked QTY"
+
+    }.issubset(headers):
+
+        return
+
+    ordered = headers["Ordered"]
+
+    received = headers["Booked QTY"]
+
+    chart = BarChart()
+
+    chart.title = "Ordered vs Received"
+
+    data = Reference(
+
+        ws,
+
+        min_col=ordered,
+
+        max_col=received,
+
+        min_row=1,
+
+        max_row=min(
+
+            ws.max_row,
+
+            21
 
         )
 
-        for row in supplier_df.itertuples(index=False):
+    )
 
-            ws.append(list(row))
+    cats = Reference(
 
-        supplier_sheets[supplier] = ws
+        ws,
 
-    return supplier_sheets
+        min_col=headers["Article"],
 
+        min_row=2,
 
-###############################################################################
-# BUILD REPORT WORKBOOK
-###############################################################################
+        max_row=min(
 
-def build_workbook(report_df):
-    """
-    Create workbook and populate
-    all worksheets.
-    """
+            ws.max_row,
 
-    wb = Workbook()
+            21
 
-    default_sheet = wb.active
-
-    wb.remove(default_sheet)
-
-    summary = create_master_summary(report_df)
-
-    write_master_summary(
-
-        wb,
-
-        summary
+        )
 
     )
 
-    create_supplier_sheets(
+    chart.add_data(
 
-        wb,
+        data,
+
+        titles_from_data=True
+
+    )
+
+    chart.set_categories(cats)
+
+    chart.height = 7
+
+    chart.width = 12
+
+    chart.dLbls = DataLabelList()
+
+    chart.dLbls.showVal = True
+
+    ws.add_chart(
+
+        chart,
+
+        f"A{ws.max_row+3}"
+
+    )
+
+
+###############################################################################
+# MASTER DASHBOARD
+###############################################################################
+
+def add_dashboard(master_ws, report_df):
+
+    stats = create_executive_summary(
 
         report_df
 
     )
 
-    return wb
+    row = 2
+
+    master_ws.insert_rows(1, amount=10)
+
+    master_ws["A1"] = REPORT_TITLE
+
+    master_ws["A1"].font = Font(
+
+        bold=True,
+
+        size=16
+
+    )
+
+    for key, value in stats.items():
+
+        master_ws.cell(
+
+            row,
+
+            1,
+
+            key
+
+        )
+
+        master_ws.cell(
+
+            row,
+
+            2,
+
+            value
+
+        )
+
+        row += 1
+
+
+###############################################################################
+# SAVE REPORT
+###############################################################################
+
+def save_workbook(
+
+    workbook,
+
+    output_folder
+
+):
+
+    output_folder = Path(
+
+        output_folder
+
+    )
+
+    output_folder.mkdir(
+
+        exist_ok=True
+
+    )
+
+    output_file = (
+
+        output_folder /
+
+        OUTPUT_FILE
+
+    )
+
+    workbook.save(
+
+        output_file
+
+    )
+
+    return output_file
+
+
+###############################################################################
+# MAIN PROCESS
+###############################################################################
+
+def process_files(
+
+    purchase_register,
+
+    receiving_report,
+
+    output_folder
+
+):
+
+    report_df = prepare_report_data(
+
+        purchase_register,
+
+        receiving_report
+
+    )
+
+    workbook = build_workbook(
+
+        report_df
+
+    )
+
+    master = workbook[MASTER_SHEET]
+
+    add_dashboard(
+
+        master,
+
+        report_df
+
+    )
+
+    for sheet in workbook.worksheets:
+
+        format_worksheet(sheet)
+
+        apply_conditional_formatting(sheet)
+
+        if sheet.title != MASTER_SHEET:
+
+            add_supplier_chart(sheet)
+
+    return save_workbook(
+
+        workbook,
+
+        output_folder
+
+    )
