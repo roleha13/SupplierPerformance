@@ -320,7 +320,11 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
         )
         .replace([float("inf")], 0)
         .fillna(0)
-        * 100
+    )  
+
+    summary["Fill Rate %"] = (
+        summary["Fill Rate %"]
+        .round(4)
     )
 
     summary.rename(
