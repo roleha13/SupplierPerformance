@@ -201,14 +201,11 @@ if generate:
 
             progress.progress(85)
 
-            output_file = process_files(
+            excel_file = process_files(
 
                 register_path,
 
                 receiving_path,
-
-                temp_dir
-
             )
 
             progress.progress(100)
@@ -225,9 +222,9 @@ if generate:
 
                     label="📥 Download Supplier Performance Report",
 
-                    data=file,
+                    data=excel_file,
 
-                    file_name=output_file.name,
+                    file_name="Supplier_Performance_Report.xlsx",
 
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 
