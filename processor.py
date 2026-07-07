@@ -376,7 +376,7 @@ def create_executive_summary(df: pd.DataFrame) -> dict:
     received = df["Booked QTY"].sum()
 
     fill_rate = (
-        (received / ordered) * 100
+        (received / ordered) 
         if ordered else 0
     )
 
@@ -395,7 +395,7 @@ def create_executive_summary(df: pd.DataFrame) -> dict:
             received,
 
         "Overall Fill Rate":
-            round(fill_rate, 2),
+            round(fill_rate, 4),
 
         "Average Delivery Days":
             round(df["Delivery Days"].mean(), 1),
@@ -436,7 +436,7 @@ def supplier_kpis(df: pd.DataFrame):
     received = df["Booked QTY"].sum()
 
     fill_rate = (
-        (received / ordered) * 100
+        (received / ordered)
         if ordered else 0
     )
 
@@ -448,7 +448,7 @@ def supplier_kpis(df: pd.DataFrame):
 
         ("Received Qty", received),
 
-        ("Fill Rate %", round(fill_rate, 2)),
+        ("Fill Rate %", round(fill_rate, 4)),
 
         ("Quantity Variance", df["Variance QTY"].sum()),
 
