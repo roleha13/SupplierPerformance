@@ -101,7 +101,7 @@ def read_purchase_register(file_path: str | Path) -> pd.DataFrame:
     Read Purchase Register workbook.
     """
 
-    df = pd.read_excel(file_path)
+    df = read_excel_file(file_path)
 
     validate_columns(
         df,
@@ -134,7 +134,7 @@ def read_receiving_report(file_path: str | Path) -> pd.DataFrame:
     Read Purchase Receiving Deviation report.
     """
 
-    df = pd.read_excel(file_path)
+    df = read_excel_file(file_path)
 
     validate_columns(
         df,
