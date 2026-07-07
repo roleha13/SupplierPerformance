@@ -11,6 +11,7 @@ Part 1
 • Delivery Days calculation
 """
 from pathlib import Path
+from io import BytesIO
 
 import pandas as pd
 
@@ -845,42 +846,18 @@ def add_dashboard(master_ws, report_df):
 ###############################################################################
 # SAVE REPORT
 ###############################################################################
+def save_workbook(workbook):
+    """
+    Save workbook to memory instead of disk.
+    """
 
-def save_workbook(
+    output = BytesIO()
 
-    workbook,
+    workbook.save(output)
 
-    output_folder
+    output.seek(0)
 
-):
-
-    output_folder = Path(
-
-        output_folder
-
-    )
-
-    output_folder.mkdir(
-
-        exist_ok=True
-
-    )
-
-    output_file = (
-
-        output_folder /
-
-        OUTPUT_FILE
-
-    )
-
-    workbook.save(
-
-        output_file
-
-    )
-
-    return output_file
+    return output
 
 
 ###############################################################################
@@ -892,9 +869,6 @@ def process_files(
     purchase_register,
 
     receiving_report,
-
-    output_folder
-
 ):
 
     report_df = prepare_report_data(
@@ -931,10 +905,4 @@ def process_files(
 
             add_supplier_chart(sheet)
 
-    return save_workbook(
-
-        workbook,
-
-        output_folder
-
-    )
+    return save_workbook(workbook)
