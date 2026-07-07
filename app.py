@@ -102,7 +102,7 @@ with col1:
 
         "Purchase Register",
 
-        type=["xlsx"]
+        type=["xls", "xlsx","xlsm"]
 
     )
 
@@ -112,7 +112,7 @@ with col2:
 
         "Purchase Receiving Deviation per Supplier",
 
-        type=["xlsx"]
+        type=["xls", "xlsx","xlsm"]
 
     )
 
