@@ -72,6 +72,50 @@ from config import (
 
 )
 
+# =============================================================================
+# READ EXCEL FILE
+# =============================================================================
+
+def read_excel_file(file_path: str | Path) -> pd.DataFrame:
+    """
+    Reads Materials Control Excel exports (.xls, .xlsx, .xlsm)
+    from the 'Data' worksheet.
+    """
+
+    file_path = Path(file_path)
+    suffix = file_path.suffix.lower()
+
+    if suffix == ".xls":
+
+        df = pd.read_excel(
+            file_path,
+            sheet_name="Data",
+            engine="xlrd"
+        )
+
+    elif suffix in [".xlsx", ".xlsm"]:
+
+        df = pd.read_excel(
+            file_path,
+            sheet_name="Data",
+            engine="openpyxl"
+        )
+
+    else:
+
+        raise ValueError(
+            f"Unsupported file type: {suffix}"
+        )
+
+    # Clean column names
+    df.columns = (
+        df.columns
+          .astype(str)
+          .str.strip()
+          .str.replace(r"\s+", " ", regex=True)
+    )
+
+    return df
 
 # =============================================================================
 # VALIDATION
@@ -91,40 +135,6 @@ def validate_columns(df: pd.DataFrame, required: set, file_name: str):
             f"{', '.join(sorted(missing))}"
         )
 
-
-# =============================================================================
-# READ EXCEL FILE
-# =============================================================================
-
-def read_excel_file(file_path: str | Path) -> pd.DataFrame:
-    """
-    Reads .xls, .xlsx and .xlsm files using the correct engine.
-    """
-
-    file_path = Path(file_path)
-
-    suffix = file_path.suffix.lower()
-
-    if suffix == ".xls":
-
-        return pd.read_excel(
-            file_path,
-            engine="xlrd"
-        )
-
-    elif suffix in [".xlsx", ".xlsm"]:
-
-        return pd.read_excel(
-            file_path,
-            engine="openpyxl"
-        )
-
-    else:
-
-        raise ValueError(
-            f"Unsupported file type: {suffix}\n"
-            "Supported formats are .xls, .xlsx and .xlsm."
-        )
 
 
 # =============================================================================
