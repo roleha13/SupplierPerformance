@@ -46,9 +46,9 @@ with st.sidebar:
         """
         ### Required Files
 
-        • Purchase Register.xlsx
+        • Purchase Register (.xls, .xlsx or .xlsm)
 
-        • Purchase Receiving Deviation per Supplier.xlsx
+        • Purchase Receiving Deviation per Supplier (.xls, .xlsx or .xlsm)
         """
     )
 
@@ -216,20 +216,19 @@ if generate:
 
             )
 
+            st.download_button(
 
-                st.download_button(
+                label="📥 Download Supplier Performance Report",
 
-                    label="📥 Download Supplier Performance Report",
+                data=excel_file,
 
-                    data=excel_file,
+                file_name="Supplier_Performance_Report.xlsx",
 
-                    file_name="Supplier_Performance_Report.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
 
-                    use_container_width=True
-
-                )
+             )
 
     except Exception as e:
 
