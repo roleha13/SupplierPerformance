@@ -93,6 +93,41 @@ def validate_columns(df: pd.DataFrame, required: set, file_name: str):
 
 
 # =============================================================================
+# READ EXCEL FILE
+# =============================================================================
+
+def read_excel_file(file_path: str | Path) -> pd.DataFrame:
+    """
+    Reads .xls, .xlsx and .xlsm files using the correct engine.
+    """
+
+    file_path = Path(file_path)
+
+    suffix = file_path.suffix.lower()
+
+    if suffix == ".xls":
+
+        return pd.read_excel(
+            file_path,
+            engine="xlrd"
+        )
+
+    elif suffix in [".xlsx", ".xlsm"]:
+
+        return pd.read_excel(
+            file_path,
+            engine="openpyxl"
+        )
+
+    else:
+
+        raise ValueError(
+            f"Unsupported file type: {suffix}\n"
+            "Supported formats are .xls, .xlsx and .xlsm."
+        )
+
+
+# =============================================================================
 # READ PURCHASE REGISTER
 # =============================================================================
 
