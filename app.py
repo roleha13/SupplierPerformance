@@ -144,7 +144,7 @@ if generate:
     if purchase_register is None:
 
         st.error(
-            "Please upload Purchase Register.xlsx"
+            "Please upload Purchase Register file (.xls,.xlsx or ,xlsm)."
         )
 
         st.stop()
@@ -152,7 +152,7 @@ if generate:
     if receiving_report is None:
 
         st.error(
-            "Please upload Purchase Receiving Deviation.xlsx"
+            "Please upload Purchase Receiving Deviation file(.xls,.xlsx or ,xlsm)"
         )
 
         st.stop()
@@ -216,7 +216,6 @@ if generate:
 
             )
 
-            with open(output_file, "rb") as file:
 
                 st.download_button(
 
