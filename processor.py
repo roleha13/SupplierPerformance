@@ -967,7 +967,12 @@ def process_files(
     purchase_register,
 
     receiving_report,
+
 ):
+
+    # ---------------------------------------------------------
+    # Prepare report data
+    # ---------------------------------------------------------
 
     report_df = prepare_report_data(
 
@@ -977,11 +982,35 @@ def process_files(
 
     )
 
+    # ---------------------------------------------------------
+    # Determine report period for output filename
+    # ---------------------------------------------------------
+
+    report_period = (
+
+        report_df["Order Date"]
+
+        .dropna()
+
+        .min()
+
+        .strftime("%B_%Y")
+
+    )
+
+    # ---------------------------------------------------------
+    # Build workbook
+    # ---------------------------------------------------------
+
     workbook = build_workbook(
 
         report_df
 
     )
+
+    # ---------------------------------------------------------
+    # Add dashboard
+    # ---------------------------------------------------------
 
     master = workbook[MASTER_SHEET]
 
@@ -993,6 +1022,10 @@ def process_files(
 
     )
 
+    # ---------------------------------------------------------
+    # Format worksheets
+    # ---------------------------------------------------------
+
     for sheet in workbook.worksheets:
 
         format_worksheet(sheet)
@@ -1003,4 +1036,8 @@ def process_files(
 
             add_supplier_chart(sheet)
 
-    return save_workbook(workbook)
+    # ---------------------------------------------------------
+    # Return workbook and report period
+    # ---------------------------------------------------------
+
+    return save_workbook(workbook), report_period
