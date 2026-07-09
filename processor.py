@@ -266,14 +266,67 @@ def merge_order_dates(
     register_df: pd.DataFrame
 ) -> pd.DataFrame:
     """
-    Merge Order Date into receiving report.
+    Merge Order Date from Purchase Register into the
+    Purchase Receiving Deviation report.
+
+    Prevents row multiplication by ensuring only one
+    Order Date exists per Order No.
+
+    Raises an error if an Order No. has multiple
+    different Order Dates.
     """
 
-    return receiving_df.merge(
-        register_df,
-        how="left",
-        on="Order No."
+    # ---------------------------------------------------------
+    # Check for conflicting Order Dates
+    # ---------------------------------------------------------
+
+    conflicting = (
+        register_df
+        .groupby("Order No.")["Order Date"]
+        .nunique()
     )
+
+    conflicting = conflicting[conflicting > 1]
+
+    if not conflicting.empty:
+
+        conflicting_orders = ", ".join(conflicting.index.astype(str))
+
+        raise ValueError(
+            "Data quality issue detected.\n\n"
+            "The following Order Numbers have multiple "
+            f"Order Dates in the Purchase Register:\n\n"
+            f"{conflicting_orders}\n\n"
+            "Please verify the Purchase Register export."
+        )
+
+    # ---------------------------------------------------------
+    # Keep one record per Order Number
+    # ---------------------------------------------------------
+
+    order_lookup = (
+
+        register_df[["Order No.", "Order Date"]]
+
+        .drop_duplicates(subset="Order No.")
+
+    )
+
+    # ---------------------------------------------------------
+    # Merge
+    # ---------------------------------------------------------
+
+    merged = receiving_df.merge(
+
+        order_lookup,
+
+        how="left",
+
+        on="Order No."
+
+    )
+
+    return merged
 
 
 # =============================================================================
