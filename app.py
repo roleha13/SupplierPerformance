@@ -201,7 +201,7 @@ if generate:
 
             progress.progress(85)
 
-            excel_file = process_files(
+            excel_file, report_period = process_files(
 
                 register_path,
 
@@ -222,7 +222,7 @@ if generate:
 
                 data=excel_file,
 
-                file_name="Supplier_Performance_Report.xlsx",
+                file_name="Supplier Performance Report {report_period}.xlsx",
 
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 
