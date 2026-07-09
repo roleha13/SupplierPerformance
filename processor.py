@@ -158,7 +158,9 @@ def read_purchase_register(file_path: str | Path) -> pd.DataFrame:
 
     df["Order No."] = (
         df["Order No."]
+        .fillna("")
         .astype(str)
+        .str.upper()
         .str.strip()
     )
 
@@ -213,6 +215,7 @@ def clean_receiving_data(df: pd.DataFrame) -> pd.DataFrame:
         df["Order No."]
         .fillna("")
         .astype(str)
+        .str.upper()
         .str.strip()
     )
 
@@ -272,16 +275,46 @@ def merge_order_dates(
     Prevents row multiplication by ensuring only one
     Order Date exists per Order No.
 
-    Raises an error if an Order No. has multiple
-    different Order Dates.
+    Ignores placeholder Order Numbers such as
+    'No PO defined', blank values, N/A, etc.
     """
+
+    # ---------------------------------------------------------
+    # Clean Order Numbers
+    # ---------------------------------------------------------
+
+    register_df = register_df.copy()
+
+    register_df["Order No."] = (
+        register_df["Order No."]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+    )
+
+    # ---------------------------------------------------------
+    # Ignore invalid Order Numbers
+    # ---------------------------------------------------------
+
+    invalid_orders = {
+        "",
+        "NO PO DEFINED",
+        "N/A",
+        "NONE"
+    }
+
+    valid_register = register_df[
+        ~register_df["Order No."]
+        .str.upper()
+        .isin(invalid_orders)
+    ].copy()
 
     # ---------------------------------------------------------
     # Check for conflicting Order Dates
     # ---------------------------------------------------------
 
     conflicting = (
-        register_df
+        valid_register
         .groupby("Order No.")["Order Date"]
         .nunique()
     )
@@ -301,15 +334,12 @@ def merge_order_dates(
         )
 
     # ---------------------------------------------------------
-    # Keep one record per Order Number
+    # Keep one Order Date per Order Number
     # ---------------------------------------------------------
 
     order_lookup = (
-
-        register_df[["Order No.", "Order Date"]]
-
+        valid_register[["Order No.", "Order Date"]]
         .drop_duplicates(subset="Order No.")
-
     )
 
     # ---------------------------------------------------------
@@ -317,17 +347,12 @@ def merge_order_dates(
     # ---------------------------------------------------------
 
     merged = receiving_df.merge(
-
         order_lookup,
-
         how="left",
-
         on="Order No."
-
     )
 
     return merged
-
 
 # =============================================================================
 # CALCULATE DELIVERY DAYS
