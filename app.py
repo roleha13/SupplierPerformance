@@ -71,7 +71,7 @@ st.title("📊 Supplier Performance Report")
 
 st.write(
     """
-Generate a professional supplier performance report
+Generates a professional supplier performance report
 from Purchase Register and Purchase Receiving Deviation
 workbooks.
 
