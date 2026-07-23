@@ -96,7 +96,7 @@ SUMMARY_COLUMNS = [
     "Orders",
     "Ordered Qty",
     "Received Qty",
-    "Fill Rate %",
+    "Order Fulfillment Rate %",
     "Qty Variance",
     "Price Variance",
     "Average Delivery Days"
