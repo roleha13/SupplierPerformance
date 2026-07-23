@@ -605,6 +605,76 @@ def supplier_kpis(df: pd.DataFrame):
     ]
 
 
+###############################################################################
+# ARTICLE SUMMARY (PIVOT STYLE)
+###############################################################################
+
+def create_article_summary(sheet, supplier_df, start_row):
+    """
+    Creates a pivot-style article summary with expandable order details.
+    """
+
+    sheet.cell(start_row, 1).value = "Monthly Article Summary"
+
+    start_row += 2
+
+    headers = [
+        "Article",
+        "Ordered Qty",
+        "Delivered Qty",
+        "Qty Variance"
+    ]
+
+    for col, header in enumerate(headers, start=1):
+        sheet.cell(start_row, col).value = header
+
+    summary_row = start_row + 1
+
+    article_summary = (
+        supplier_df
+        .groupby("Article", as_index=False)
+        .agg(
+            Ordered=("Ordered", "sum"),
+            Delivered=("Booked QTY", "sum"),
+            Variance=("Variance QTY", "sum")
+        )
+        .sort_values("Article")
+    )
+
+    current_row = summary_row
+
+    for _, article in article_summary.iterrows():
+
+        article_row = current_row
+
+        sheet.cell(current_row, 1).value = article["Article"]
+        sheet.cell(current_row, 2).value = article["Ordered"]
+        sheet.cell(current_row, 3).value = article["Delivered"]
+        sheet.cell(current_row, 4).value = article["Variance"]
+
+        current_row += 1
+
+        detail = supplier_df[
+            supplier_df["Article"] == article["Article"]
+        ]
+
+        for _, order in detail.iterrows():
+
+            sheet.cell(current_row, 1).value = "    " + str(order["Order No."])
+            sheet.cell(current_row, 2).value = order["Ordered"]
+            sheet.cell(current_row, 3).value = order["Booked QTY"]
+            sheet.cell(current_row, 4).value = order["Variance QTY"]
+
+            sheet.row_dimensions[current_row].outlineLevel = 1
+            sheet.row_dimensions[current_row].hidden = True
+
+            current_row += 1
+
+        sheet.row_dimensions[article_row].collapsed = True
+
+    return summary_row, current_row - 1
+
+
 # =============================================================================
 # SUPPLIER WORKSHEETS
 # =============================================================================
@@ -672,6 +742,19 @@ def create_supplier_sheets(workbook, report_df):
             if kpi == "Order Fulfillment Rate %":
 
                 sheet.cell(i, 2).number_format = "0,00%"
+
+
+        # -----------------------------
+        # ARTICLE SUMMARY
+        # -----------------------------
+
+        summary_start = start_row + len(kpis) + 4
+
+        article_start, article_end = create_article_summary(
+     
+)
+
+
 
 
 # =============================================================================
