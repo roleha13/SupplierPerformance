@@ -437,7 +437,7 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
         )
     )
 
-    summary["Fill Rate %"] = (
+    summary["Order Fulfillment Rate %"] = (
         (
             summary["Received_Qty"] /
             summary["Ordered_Qty"]
@@ -446,8 +446,8 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
         .fillna(0)
     )  
 
-    summary["Fill Rate %"] = (
-        summary["Fill Rate %"]
+    summary["Order Fulfillment Rate %"] = (
+        summary["Order Fulfillment Rate %"]
         .round(4)
     )
 
@@ -467,14 +467,14 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
         .round(1)
     )
 
-    summary["Fill Rate %"] = (
-        summary["Fill Rate %"]
-        .round(2)
+    summary["Order Fulfillment Rate %"] = (
+        summary["Order Fulfillment Rate %"]
+        .round(4)
     )
 
     summary.sort_values(
         by=[
-            "Fill Rate %",
+            "Order Fulfillment Rate %",
             "Average Delivery Days"
         ],
         ascending=[
@@ -518,7 +518,7 @@ def create_executive_summary(df: pd.DataFrame) -> dict:
         "Total Received Qty":
             received,
 
-        "Overall Fill Rate":
+        "Overall Order Fulfillment Rate %":
             round(fill_rate, 4),
 
         "Average Delivery Days":
@@ -547,6 +547,25 @@ def write_master_summary(workbook, summary_df):
 
         ws.append(list(row))
 
+    # ----------------------------------------------------
+    # Format Order Fulfillment Rate column as %
+    # ----------------------------------------------------
+
+    fulfillment_col = None
+
+    for col in range(1, ws.max_column + 1):
+
+        if ws.cell(1, col).value == "Order Fulfillment Rate %":
+
+            fulfillment_col = col
+            break
+
+    if fulfillment_col:
+
+        for row in range(2, ws.max_row + 1):
+
+            ws.cell(row, fulfillment_col).number_format = "0.00%"
+
     return ws
 
 
@@ -572,7 +591,7 @@ def supplier_kpis(df: pd.DataFrame):
 
         ("Received Qty", received),
 
-        ("Fill Rate %", round(fill_rate, 4)),
+        ("Order Fulfillment Rate %", round(fill_rate, 4)),
 
         ("Quantity Variance", df["Variance QTY"].sum()),
 
@@ -649,6 +668,10 @@ def create_supplier_sheets(workbook, report_df):
 
             sheet.cell(i, 1).value = kpi
             sheet.cell(i, 2).value = value
+
+            if kpi == "Order Fulfillment Rate %":
+
+                sheet.cell(i, 2).number_format = "0,00%"
 
 
 # =============================================================================
