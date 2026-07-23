@@ -727,7 +727,7 @@ def create_supplier_sheets(workbook, report_df):
             "Supplier KPI Summary"
         )
 
-        kpis = supplier_kpis(
+        kpis = supplier_kpis( 
             supplier_df
         )
 
@@ -743,7 +743,6 @@ def create_supplier_sheets(workbook, report_df):
 
                 sheet.cell(i, 2).number_format = "0,00%"
 
-
         # -----------------------------
         # ARTICLE SUMMARY
         # -----------------------------
@@ -751,11 +750,11 @@ def create_supplier_sheets(workbook, report_df):
         summary_start = start_row + len(kpis) + 4
 
         article_start, article_end = create_article_summary(
-     
-)
-
-
-
+            sheet,
+            supplier_df,
+            summary_start
+        )
+       
 
 # =============================================================================
 # BUILD WORKBOOK
