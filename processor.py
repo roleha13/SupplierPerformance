@@ -1020,34 +1020,77 @@ def apply_conditional_formatting(ws):
 # CHARTS
 ###############################################################################
 
-
 def add_supplier_chart(
-    sheet,
+    ws,
     article_start,
     summary_rows
 ):
     """
-    Ordered vs Delivered chart
-    using Monthly Article Summary.
+    Create an Ordered vs Delivered chart using the
+    Monthly Article Summary.
+
+    Because OpenPyXL cannot chart non-contiguous rows,
+    a hidden Chart Data table is first created from the
+    article summary rows.
     """
+
+    # ---------------------------------------------------------
+    # CREATE HIDDEN CHART DATA TABLE
+    # ---------------------------------------------------------
+
+    chart_start = ws.max_row + 3
+
+    ws.cell(chart_start, 1).value = "Chart Data"
+
+    chart_start += 1
+
+    ws.cell(chart_start, 1).value = "Article"
+    ws.cell(chart_start, 2).value = "Ordered Qty"
+    ws.cell(chart_start, 3).value = "Delivered Qty"
+
+    chart_row = chart_start + 1
+
+    for row in summary_rows:
+
+        ws.cell(chart_row, 1).value = ws.cell(row, 1).value
+        ws.cell(chart_row, 2).value = ws.cell(row, 2).value
+        ws.cell(chart_row, 3).value = ws.cell(row, 3).value
+
+        chart_row += 1
+
+    # ---------------------------------------------------------
+    # HIDE CHART DATA TABLE
+    # ---------------------------------------------------------
+
+    for r in range(chart_start - 1, chart_row):
+
+        ws.row_dimensions[r].hidden = True
+
+    # ---------------------------------------------------------
+    # CREATE CHART
+    # ---------------------------------------------------------
 
     chart = BarChart()
 
     chart.title = "Ordered vs Delivered by Article"
 
-    labels = Reference(
-        ws,
-        min_col=1,
-        min_row=article_start + 1,
-        max_row=article_end
-    )
+    chart.y_axis.title = "Quantity"
+
+    chart.x_axis.title = "Article"
 
     data = Reference(
         ws,
         min_col=2,
         max_col=3,
-        min_row=article_start,
-        max_row=article_end
+        min_row=chart_start,
+        max_row=chart_row - 1
+    )
+
+    labels = Reference(
+        ws,
+        min_col=1,
+        min_row=chart_start + 1,
+        max_row=chart_row - 1
     )
 
     chart.add_data(
@@ -1057,15 +1100,21 @@ def add_supplier_chart(
 
     chart.set_categories(labels)
 
-    chart.height = 7
-    chart.width = 12
+    chart.height = 8
+
+    chart.width = 14
 
     chart.dLbls = DataLabelList()
+
     chart.dLbls.showVal = True
+
+    # ---------------------------------------------------------
+    # POSITION CHART
+    # ---------------------------------------------------------
 
     ws.add_chart(
         chart,
-        f"F{article_end+3}"
+        f"F{chart_start}"
     )
 
 ###############################################################################
