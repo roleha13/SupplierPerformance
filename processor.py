@@ -611,68 +611,155 @@ def supplier_kpis(df: pd.DataFrame):
 
 def create_article_summary(sheet, supplier_df, start_row):
     """
-    Creates a pivot-style article summary with expandable order details.
+    Creates a pivot-style Monthly Article Summary with
+    expandable Order Number details.
+
+    Returns
+    -------
+    summary_row : int
+        First row of the article summary table.
+
+    summary_rows : list[int]
+        Worksheet row numbers containing ONLY the
+        article summary rows. Used for chart creation.
     """
+
+    # -------------------------------------------------------------------------
+    # Title
+    # -------------------------------------------------------------------------
 
     sheet.cell(start_row, 1).value = "Monthly Article Summary"
 
     start_row += 2
 
+    # -------------------------------------------------------------------------
+    # Headers
+    # -------------------------------------------------------------------------
+
     headers = [
+
         "Article",
         "Ordered Qty",
         "Delivered Qty",
         "Qty Variance"
+
     ]
 
     for col, header in enumerate(headers, start=1):
+
         sheet.cell(start_row, col).value = header
 
     summary_row = start_row + 1
 
+    # -------------------------------------------------------------------------
+    # Keep track of ONLY article rows
+    # -------------------------------------------------------------------------
+
+    summary_rows = []
+
+    # -------------------------------------------------------------------------
+    # Monthly Article Totals
+    # -------------------------------------------------------------------------
+
     article_summary = (
+
         supplier_df
+
         .groupby("Article", as_index=False)
+
         .agg(
+
             Ordered=("Ordered", "sum"),
+
             Delivered=("Booked QTY", "sum"),
+
             Variance=("Variance QTY", "sum")
+
         )
+
         .sort_values("Article")
+
     )
 
     current_row = summary_row
 
+    # -------------------------------------------------------------------------
+    # Write each Article
+    # -------------------------------------------------------------------------
+
     for _, article in article_summary.iterrows():
 
         article_row = current_row
+
+        # -------------------------------------------------------------
+        # Summary Row
+        # -------------------------------------------------------------
 
         sheet.cell(current_row, 1).value = article["Article"]
         sheet.cell(current_row, 2).value = article["Ordered"]
         sheet.cell(current_row, 3).value = article["Delivered"]
         sheet.cell(current_row, 4).value = article["Variance"]
 
+        # Save this row for charting
+        summary_rows.append(current_row)
+
         current_row += 1
 
-        detail = supplier_df[
-            supplier_df["Article"] == article["Article"]
-        ]
+        # -------------------------------------------------------------
+        # Order Detail Rows
+        # -------------------------------------------------------------
+
+        detail = (
+
+            supplier_df[
+                supplier_df["Article"] == article["Article"]
+            ]
+
+            .sort_values(
+                [
+                    "Order Date",
+                    "Order No."
+                ]
+            )
+
+        )
 
         for _, order in detail.iterrows():
 
-            sheet.cell(current_row, 1).value = "    " + str(order["Order No."])
-            sheet.cell(current_row, 2).value = order["Ordered"]
-            sheet.cell(current_row, 3).value = order["Booked QTY"]
-            sheet.cell(current_row, 4).value = order["Variance QTY"]
+            sheet.cell(
+                current_row,
+                1
+            ).value = "    " + str(order["Order No."])
 
+            sheet.cell(
+                current_row,
+                2
+            ).value = order["Ordered"]
+
+            sheet.cell(
+                current_row,
+                3
+            ).value = order["Booked QTY"]
+
+            sheet.cell(
+                current_row,
+                4
+            ).value = order["Variance QTY"]
+
+            # Make order rows collapsible
             sheet.row_dimensions[current_row].outlineLevel = 1
             sheet.row_dimensions[current_row].hidden = True
 
             current_row += 1
 
+        # Collapse under article
         sheet.row_dimensions[article_row].collapsed = True
 
-    return summary_row, current_row - 1
+    # -------------------------------------------------------------------------
+    # Return ONLY article rows
+    # -------------------------------------------------------------------------
+
+    return summary_row, summary_rows
 
 
 # =============================================================================
@@ -749,11 +836,17 @@ def create_supplier_sheets(workbook, report_df):
 
         summary_start = start_row + len(kpis) + 4
 
-        article_start, article_end = create_article_summary(
+        article_start, summary_rows = create_article_summary(
             sheet,
             supplier_df,
             summary_start
         )
+
+        add_supplier_chart(
+        sheet,
+        article_start,
+        summary_rows
+       )
        
 
 # =============================================================================
@@ -927,98 +1020,53 @@ def apply_conditional_formatting(ws):
 # CHARTS
 ###############################################################################
 
-def add_supplier_chart(ws):
 
-    headers = {
-
-        cell.value: cell.column
-
-        for cell in ws[1]
-
-    }
-
-    if not {
-
-        "Ordered",
-
-        "Booked QTY"
-
-    }.issubset(headers):
-
-        return
-
-    ordered = headers["Ordered"]
-
-    received = headers["Booked QTY"]
+def add_supplier_chart(
+    sheet,
+    article_start,
+    summary_rows
+):
+    """
+    Ordered vs Delivered chart
+    using Monthly Article Summary.
+    """
 
     chart = BarChart()
 
-    chart.title = "Ordered vs Received"
+    chart.title = "Ordered vs Delivered by Article"
 
-    data = Reference(
-
+    labels = Reference(
         ws,
-
-        min_col=ordered,
-
-        max_col=received,
-
-        min_row=1,
-
-        max_row=min(
-
-            ws.max_row,
-
-            21
-
-        )
-
+        min_col=1,
+        min_row=article_start + 1,
+        max_row=article_end
     )
 
-    cats = Reference(
-
+    data = Reference(
         ws,
-
-        min_col=headers["Article"],
-
-        min_row=2,
-
-        max_row=min(
-
-            ws.max_row,
-
-            21
-
-        )
-
+        min_col=2,
+        max_col=3,
+        min_row=article_start,
+        max_row=article_end
     )
 
     chart.add_data(
-
         data,
-
         titles_from_data=True
-
     )
 
-    chart.set_categories(cats)
+    chart.set_categories(labels)
 
     chart.height = 7
-
     chart.width = 12
 
     chart.dLbls = DataLabelList()
-
     chart.dLbls.showVal = True
 
     ws.add_chart(
-
         chart,
-
-        f"A{ws.max_row+3}"
-
+        f"F{article_end+3}"
     )
-
 
 ###############################################################################
 # MASTER DASHBOARD
@@ -1161,10 +1209,6 @@ def process_files(
         format_worksheet(sheet)
 
         apply_conditional_formatting(sheet)
-
-        if sheet.title != MASTER_SHEET:
-
-            add_supplier_chart(sheet)
 
     # ---------------------------------------------------------
     # Return workbook and report period
