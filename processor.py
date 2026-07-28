@@ -817,6 +817,45 @@ def create_article_summary(sheet, supplier_df, start_row):
 
     return summary_row, summary_rows
 
+###############################################################################
+# HELPER TABLE
+###############################################################################
+
+def create_helper_table(sheet, supplier_df, start_row):
+    """
+    Creates a hidden helper table containing one row per Purchase Order.
+    Used for Excel KPI formulas.
+    """
+
+    helper = (
+        supplier_df[
+            [
+                "Order No.",
+                "Delivery Days"
+            ]
+        ]
+        .drop_duplicates(subset=["Order No."])
+        .sort_values("Order No.")
+    )
+
+    sheet.cell(start_row, 27).value = "Order No."
+    sheet.cell(start_row, 28).value = "Delivery Days"
+
+    row = start_row + 1
+
+    for _, order in helper.iterrows():
+
+        sheet.cell(row, 27).value = order["Order No."]
+        sheet.cell(row, 28).value = order["Delivery Days"]
+
+        row += 1
+
+    # Hide helper columns (AA = 27, AB = 28)
+    sheet.column_dimensions["AA"].hidden = True
+    sheet.column_dimensions["AB"].hidden = True
+
+    return row - 1
+
 
 # =============================================================================
 # SUPPLIER WORKSHEETS
@@ -858,6 +897,20 @@ def create_supplier_sheets(workbook, report_df):
 
             sheet.append(list(row))
 
+        last_data_row = sheet.max_row
+
+        # -----------------------------
+        # HELPER TABLE
+        # -----------------------------
+
+        helper_start = last_data_row + 3
+
+        helper_end = create_helper_table(
+            sheet,
+            supplier_df,
+            helper_start
+        )
+
         # -----------------------------
         # KPI PANEL
         # -----------------------------
@@ -879,17 +932,56 @@ def create_supplier_sheets(workbook, report_df):
             start=start_row + 1
         ):
 
-            sheet.cell(i, 1).value = kpi
-            sheet.cell(i, 2).value = value
+             sheet.cell(i, 1).value = kpi
 
-            if kpi == "Order Fulfillment Rate %":
+             value_cell = sheet.cell(i, 2)
 
-                sheet.cell(i, 2).number_format = "0,00%"
+             if kpi == "Orders":
 
-        # -----------------------------
-        # ARTICLE SUMMARY
-        # -----------------------------
+                 value_cell.value = (
+                     f"=COUNTA(AA{helper_start+1}:AA{helper_end})"
+                )
 
+             elif kpi == "Ordered Qty":
+
+                 value_cell.value = (
+                     f"=SUM(G2:G{last_data_row})"
+                )
+
+             elif kpi == "Received Qty":
+
+                 value_cell.value = (
+                     f"=SUM(I2:I{last_data_row})"
+                 )
+
+             elif kpi == "Quantity Variance":
+
+                 value_cell.value = (
+                     f"=SUM(J2:J{last_data_row})"
+                 )
+
+             elif kpi == "Price Variance":
+
+                 value_cell.value = (
+                     f"=SUM(N2:N{last_data_row})"
+                  )
+
+              elif kpi == "Order Fulfillment Rate %":
+
+                  value_cell.value = (
+                      f"=IF(B{start_row+2}=0,0,B{start_row+3}/B{start_row+2})"
+                  )
+
+                  value_cell.number_format = "0.00%"
+
+              elif kpi == "Average Delivery Days":
+
+                  value_cell.value = (
+                      f"=AVERAGE(AB{helper_start+1}:AB{helper_end})"
+                   )
+
+                   value_cell.number_format = "0.0"
+        
         summary_start = start_row + len(kpis) + 4
 
         article_start, summary_rows = create_article_summary(
@@ -1308,7 +1400,7 @@ def process_files(
     # ---------------------------------------------------------
     # Format worksheets
     # ---------------------------------------------------------
-
++
     for sheet in workbook.worksheets:
 
         format_worksheet(sheet)
