@@ -423,7 +423,33 @@ def prepare_report_data(
 def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
     """
     Create supplier performance summary.
+    Average Delivery Days is calculated per unique
+    Purchase Order instead of per article line.
     """
+
+    # -------------------------------------------------------------------------
+    # Delivery Days (One record per Purchase Order)
+    # -------------------------------------------------------------------------
+
+    delivery_summary = (
+        df[
+            ["Supplier", "Order No.", "Delivery Days"]
+        ]
+        .drop_duplicates(
+            subset=["Supplier", "Order No."]
+        )
+        .groupby(
+            "Supplier",
+            as_index=False
+        )
+        .agg(
+            Average_Delivery_Days=("Delivery Days", "mean")
+        )
+    )
+
+    # -------------------------------------------------------------------------
+    # Main Supplier KPIs
+    # -------------------------------------------------------------------------
 
     summary = (
         df.groupby("Supplier", as_index=False)
@@ -432,10 +458,23 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
             Ordered_Qty=("Ordered", "sum"),
             Received_Qty=("Booked QTY", "sum"),
             Qty_Variance=("Variance QTY", "sum"),
-            Price_Variance=("Variance Value", "sum"),
-            Average_Delivery_Days=("Delivery Days", "mean")
+            Price_Variance=("Variance Value", "sum")
         )
     )
+
+    # -------------------------------------------------------------------------
+    # Merge Average Delivery Days
+    # -------------------------------------------------------------------------
+
+    summary = summary.merge(
+        delivery_summary,
+        on="Supplier",
+        how="left"
+    )
+
+    # -------------------------------------------------------------------------
+    # Order Fulfillment Rate
+    # -------------------------------------------------------------------------
 
     summary["Order Fulfillment Rate %"] = (
         (
@@ -444,12 +483,12 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
         )
         .replace([float("inf")], 0)
         .fillna(0)
-    )  
-
-    summary["Order Fulfillment Rate %"] = (
-        summary["Order Fulfillment Rate %"]
         .round(4)
     )
+
+    # -------------------------------------------------------------------------
+    # Rename Columns
+    # -------------------------------------------------------------------------
 
     summary.rename(
         columns={
@@ -457,20 +496,23 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
             "Received_Qty": "Received Qty",
             "Qty_Variance": "Qty Variance",
             "Price_Variance": "Price Variance",
-            "Average_Delivery_Days": "Average Delivery Days",
+            "Average_Delivery_Days": "Average Delivery Days"
         },
-        inplace=True,
+        inplace=True
     )
+
+    # -------------------------------------------------------------------------
+    # Round Values
+    # -------------------------------------------------------------------------
 
     summary["Average Delivery Days"] = (
         summary["Average Delivery Days"]
         .round(1)
     )
 
-    summary["Order Fulfillment Rate %"] = (
-        summary["Order Fulfillment Rate %"]
-        .round(4)
-    )
+    # -------------------------------------------------------------------------
+    # Sort Suppliers
+    # -------------------------------------------------------------------------
 
     summary.sort_values(
         by=[
@@ -484,9 +526,13 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
         inplace=True
     )
 
-    return summary.reset_index(drop=True)
+    summary.reset_index(
+        drop=True,
+        inplace=True
+    )
 
-
+    return summary
+    
 # =============================================================================
 # EXECUTIVE SUMMARY
 # =============================================================================
@@ -576,11 +622,21 @@ def write_master_summary(workbook, summary_df):
 def supplier_kpis(df: pd.DataFrame):
 
     ordered = df["Ordered"].sum()
+
     received = df["Booked QTY"].sum()
 
     fill_rate = (
         (received / ordered)
         if ordered else 0
+    )
+
+    delivery_days = (
+        df[
+            ["Order No.", "Delivery Days"]
+        ]
+        .drop_duplicates(subset=["Order No."])
+        ["Delivery Days"]
+        .mean()
     )
 
     return [
@@ -599,7 +655,7 @@ def supplier_kpis(df: pd.DataFrame):
 
         (
             "Average Delivery Days",
-            round(df["Delivery Days"].mean(), 1)
+            round(delivery_days, 1)
         )
 
     ]
