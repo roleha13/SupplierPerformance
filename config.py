@@ -46,6 +46,7 @@ REGISTER_REQUIRED_COLUMNS = [
 RECEIVING_INPUT_COLUMNS = [
 
     "Supplier",
+    "Cost Center/Store",
     "Article",
     "Ordered",
     "Order Unit",
@@ -68,6 +69,7 @@ RECEIVING_INPUT_COLUMNS = [
 REPORT_COLUMNS = [
 
     "Supplier",
+    "Cost Center/Store",
     "Article",
     "Order No.",
     "Order Date",
