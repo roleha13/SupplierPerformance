@@ -932,55 +932,55 @@ def create_supplier_sheets(workbook, report_df):
             start=start_row + 1
         ):
 
-             sheet.cell(i, 1).value = kpi
+            sheet.cell(i, 1).value = kpi
 
-             value_cell = sheet.cell(i, 2)
+            value_cell = sheet.cell(i, 2)
 
-             if kpi == "Orders":
+            if kpi == "Orders":
 
-                 value_cell.value = (
-                     f"=COUNTA(AA{helper_start+1}:AA{helper_end})"
+                value_cell.value = (
+                    f"=COUNTA(AA{helper_start+1}:AA{helper_end})"
                 )
 
-             elif kpi == "Ordered Qty":
+            elif kpi == "Ordered Qty":
 
-                 value_cell.value = (
-                     f"=SUM(G2:G{last_data_row})"
+                value_cell.value = (
+                    f"=SUM(G2:G{last_data_row})"
                 )
 
-             elif kpi == "Received Qty":
+            elif kpi == "Received Qty":
 
-                 value_cell.value = (
-                     f"=SUM(I2:I{last_data_row})"
-                 )
+                value_cell.value = (
+                    f"=SUM(I2:I{last_data_row})"
+                )
 
-             elif kpi == "Quantity Variance":
+            elif kpi == "Quantity Variance":
 
-                 value_cell.value = (
-                     f"=SUM(J2:J{last_data_row})"
-                 )
+                value_cell.value = (
+                    f"=SUM(J2:J{last_data_row})"
+                )
 
-             elif kpi == "Price Variance":
+            elif kpi == "Price Variance":
 
-                 value_cell.value = (
-                     f"=SUM(N2:N{last_data_row})"
-                  )
+                value_cell.value = (
+                    f"=SUM(N2:N{last_data_row})"
+                )
 
-              elif kpi == "Order Fulfillment Rate %":
+            elif kpi == "Order Fulfillment Rate %":
 
-                  value_cell.value = (
-                      f"=IF(B{start_row+2}=0,0,B{start_row+3}/B{start_row+2})"
-                  )
+                value_cell.value = (
+                    f"=IF(B{start_row+2}=0,0,B{start_row+3}/B{start_row+2})"
+                )
 
-                  value_cell.number_format = "0.00%"
+                value_cell.number_format = "0.00%"
 
-              elif kpi == "Average Delivery Days":
+            elif kpi == "Average Delivery Days":
 
-                  value_cell.value = (
-                      f"=AVERAGE(AB{helper_start+1}:AB{helper_end})"
-                   )
+                value_cell.value = (
+                    f"=AVERAGE(AB{helper_start+1}:AB{helper_end})"
+                )
 
-                   value_cell.number_format = "0.0"
+                value_cell.number_format = "0.0"
         
         summary_start = start_row + len(kpis) + 4
 
@@ -991,10 +991,10 @@ def create_supplier_sheets(workbook, report_df):
         )
 
         add_supplier_chart(
-        sheet,
-        article_start,
-        summary_rows
-       )
+            sheet,
+            article_start,
+            summary_rows
+        )
        
 
 # =============================================================================
