@@ -951,13 +951,13 @@ def create_supplier_sheets(workbook, report_df):
             elif kpi == "Received Qty":
 
                 value_cell.value = (
-                    f"=SUM(I2:I{last_data_row})"
+                    f"=SUM(J2:J{last_data_row})"
                 )
 
             elif kpi == "Quantity Variance":
 
                 value_cell.value = (
-                    f"=SUM(J2:J{last_data_row})"
+                    f"=SUM(K2:K{last_data_row})"
                 )
 
             elif kpi == "Price Variance":
