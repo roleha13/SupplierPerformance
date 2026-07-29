@@ -1400,7 +1400,7 @@ def process_files(
     # ---------------------------------------------------------
     # Format worksheets
     # ---------------------------------------------------------
-+
+
     for sheet in workbook.worksheets:
 
         format_worksheet(sheet)
