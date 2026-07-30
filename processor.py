@@ -1367,11 +1367,11 @@ def process_files(
 
     report_period = (
 
-        report_df["Order Date"]
+        report_df["Delivery Date"]
 
         .dropna()
 
-        .min()
+        .max()
 
         .strftime("%B_%Y")
 
