@@ -222,7 +222,7 @@ if generate:
 
                 data=excel_file,
 
-                file_name="Supplier Performance Report {report_period}.xlsx",
+                file_name=f"Supplier Performance Report {report_period}.xlsx",
 
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 
