@@ -698,6 +698,7 @@ def create_article_summary(sheet, supplier_df, start_row):
         "Ordered Qty",
         "Delivered Qty",
         "Qty Variance"
+        "No. of Orders"
 
     ]
 
@@ -730,6 +731,8 @@ def create_article_summary(sheet, supplier_df, start_row):
             Delivered=("Booked QTY", "sum"),
 
             Variance=("Variance QTY", "sum")
+            
+            Order_Frequency=("Order No.", "nunique")
 
         )
 
@@ -755,6 +758,7 @@ def create_article_summary(sheet, supplier_df, start_row):
         sheet.cell(current_row, 2).value = article["Ordered"]
         sheet.cell(current_row, 3).value = article["Delivered"]
         sheet.cell(current_row, 4).value = article["Variance"]
+        sheet.cell(current_row, 5).value = article["Order_Frequency"]
 
         # Save this row for charting
         summary_rows.append(current_row)
