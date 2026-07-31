@@ -832,15 +832,18 @@ def create_helper_table(sheet, supplier_df, start_row):
     """
 
     helper = (
-        supplier_df[
-            [
-                "Order No.",
-                "Delivery Days"
-            ]
-        ]
-        .drop_duplicates(subset=["Order No."])
-        .sort_values("Order No.")
+        supplier_df
+        .groupby("Order No.", as_index=False )
+        .agg(
+            Order_Date=("Order Date", "first"),
+            Last_Delivery_Date=("Delivery Date", "max")
+        )
     )
+
+    helper["Delivery Days"] = (
+        helper["Last_Delivery_Date"]
+        - helper["Order_Date"]
+    ).dt.days
 
     sheet.cell(start_row, 27).value = "Order No."
     sheet.cell(start_row, 28).value = "Delivery Days"
