@@ -579,41 +579,65 @@ def create_executive_summary(df: pd.DataFrame) -> dict:
     }
 
 
-# =============================================================================
-# MASTER SUMMARY SHEET
-# =============================================================================
+from openpyxl.styles import Font
 
 def write_master_summary(workbook, summary_df):
 
     ws = workbook.create_sheet("Master Summary")
 
+    # -----------------------------------------------------
+    # Headers
+    # -----------------------------------------------------
+
     ws.append(summary_df.columns.tolist())
+
+    # -----------------------------------------------------
+    # Write Summary
+    # -----------------------------------------------------
+
+    current_row = 2
 
     for row in summary_df.itertuples(index=False):
 
         ws.append(list(row))
 
-    # ----------------------------------------------------
-    # Format Order Fulfillment Rate column as %
-    # ----------------------------------------------------
+        supplier_cell = ws.cell(current_row, 1)
 
-    fulfillment_col = None
+        supplier_name = str(supplier_cell.value)
 
-    for col in range(1, ws.max_column + 1):
+        supplier_cell.hyperlink = (
+            f"#'{supplier_name[:31]}'!A1"
+        )
 
-        if ws.cell(1, col).value == "Order Fulfillment Rate %":
+        supplier_cell.style = "Hyperlink"
 
-            fulfillment_col = col
-            break
+        current_row += 1
 
-    if fulfillment_col:
+    # -----------------------------------------------------
+    # Header Dictionary
+    # -----------------------------------------------------
+
+    headers = {
+        cell.value: cell.column
+        for cell in ws[1]
+    }
+
+    # -----------------------------------------------------
+    # Format Order Fulfillment Rate as %
+    # -----------------------------------------------------
+
+    if "Order Fulfillment Rate %" in headers:
+
+        fulfillment_col = headers["Order Fulfillment Rate %"]
 
         for row in range(2, ws.max_row + 1):
 
-            ws.cell(row, fulfillment_col).number_format = "0.00%"
+            ws.cell(
+                row,
+                fulfillment_col
+            ).number_format = "0.00%"
 
     return ws
-
 
 # =============================================================================
 # SUPPLIER KPI PANEL
