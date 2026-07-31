@@ -786,8 +786,11 @@ def create_article_summary(sheet, supplier_df, start_row):
         sheet.cell(current_row, 2).value = article["Ordered"]
         sheet.cell(current_row, 3).value = article["Delivered"]
         sheet.cell(current_row, 4).value = article["Variance"]
-        sheet.cell(current_row, 5).value = article["Order_Frequency"]
 
+        freq_cell = sheet.cell(current_row, 5)
+        freq_cell.value = article["Order_Frequency"]
+        freq_cell.number_format = "0"
+        
         # Save this row for charting
         summary_rows.append(current_row)
 
