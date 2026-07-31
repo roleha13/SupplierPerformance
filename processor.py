@@ -578,6 +578,10 @@ def create_executive_summary(df: pd.DataFrame) -> dict:
 
     }
 
+# =============================================================================
+# MASTER SUMMARY SHEET
+# =============================================================================
+
 
 from openpyxl.styles import Font
 
@@ -1300,52 +1304,121 @@ def add_supplier_chart(
 # MASTER DASHBOARD
 ###############################################################################
 
+from openpyxl.styles import Font
+
 def add_dashboard(master_ws, report_df):
+    """
+    Creates a live Executive Dashboard using Excel formulas
+    linked to the Master Summary table.
+    """
 
-    stats = create_executive_summary(
-
-        report_df
-
-    )
-
-    row = 2
+    # ---------------------------------------------------------
+    # Dashboard Title
+    # ---------------------------------------------------------
 
     master_ws.insert_rows(1, amount=10)
 
     master_ws["A1"] = REPORT_TITLE
 
     master_ws["A1"].font = Font(
-
         bold=True,
-
         size=16
-
     )
 
-    for key, value in stats.items():
+    # ---------------------------------------------------------
+    # Locate Master Summary columns
+    # ---------------------------------------------------------
+
+    headers = {
+        cell.value: cell.column
+        for cell in master_ws[11]
+    }
+
+    summary_last_row = master_ws.max_row
+
+    # Convert column numbers to Excel letters
+
+    from openpyxl.utils import get_column_letter
+
+    supplier_col = get_column_letter(headers["Supplier"])
+    orders_col = get_column_letter(headers["Orders"])
+    ordered_col = get_column_letter(headers["Ordered Qty"])
+    received_col = get_column_letter(headers["Received Qty"])
+    qty_var_col = get_column_letter(headers["Qty Variance"])
+    price_var_col = get_column_letter(headers["Price Variance"])
+    avg_days_col = get_column_letter(headers["Average Delivery Days"])
+
+    # ---------------------------------------------------------
+    # Dashboard Labels
+    # ---------------------------------------------------------
+
+    dashboard = [
+
+        ("Total Suppliers",
+         f"=COUNTA({supplier_col}12:{supplier_col}{summary_last_row})"),
+
+        ("Total Orders",
+         f"=SUM({orders_col}12:{orders_col}{summary_last_row})"),
+
+        ("Total Ordered Qty",
+         f"=SUM({ordered_col}12:{ordered_col}{summary_last_row})"),
+
+        ("Total Received Qty",
+         f"=SUM({received_col}12:{received_col}{summary_last_row})"),
+
+        ("Overall Order Fulfillment Rate",
+         f"=IF(SUM({ordered_col}12:{ordered_col}{summary_last_row})=0,"
+         f"0,"
+         f"SUM({received_col}12:{received_col}{summary_last_row})/"
+         f"SUM({ordered_col}12:{ordered_col}{summary_last_row}))"),
+
+        ("Average Delivery Days",
+         f"=AVERAGE({avg_days_col}12:{avg_days_col}{summary_last_row})"),
+
+        ("Total Price Variance",
+         f"=SUM({price_var_col}12:{price_var_col}{summary_last_row})"),
+
+        ("Total Quantity Variance",
+         f"=SUM({qty_var_col}12:{qty_var_col}{summary_last_row})")
+
+    ]
+
+    # ---------------------------------------------------------
+    # Write Dashboard
+    # ---------------------------------------------------------
+
+    start_row = 2
+
+    for label, formula in dashboard:
 
         master_ws.cell(
+            start_row,
+            1
+        ).value = label
 
-            row,
-
-            1,
-
-            key
-
+        value_cell = master_ws.cell(
+            start_row,
+            2
         )
 
-        master_ws.cell(
+        value_cell.value = formula
 
-            row,
+        # Percentage formatting
+        if "Fulfillment Rate" in label:
 
-            2,
+            value_cell.number_format = "0.00%"
 
-            value
+        # Decimal formatting
+        elif "Average Delivery Days" in label:
 
-        )
+            value_cell.number_format = "0.0"
 
-        row += 1
+        # Quantity formatting
+        else:
 
+            value_cell.number_format = '#,##0.00'
+
+        start_row += 1
 
 ###############################################################################
 # SAVE REPORT
