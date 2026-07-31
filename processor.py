@@ -952,7 +952,7 @@ def create_supplier_sheets(workbook, report_df):
             elif kpi == "Ordered Qty":
 
                 value_cell.value = (
-                    f"=SUM(G2:G{last_data_row})"
+                    f"=SUM(H2:H{last_data_row})"
                 )
 
             elif kpi == "Received Qty":
