@@ -730,7 +730,7 @@ def create_article_summary(sheet, supplier_df, start_row):
 
             Delivered=("Booked QTY", "sum"),
 
-            Variance=("Variance QTY", "sum")
+            Variance=("Variance QTY", "sum"),
             
             Order_Frequency=("Order No.", "nunique")
 
