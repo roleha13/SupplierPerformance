@@ -725,7 +725,7 @@ def create_article_summary(sheet, supplier_df, start_row):
         "Article",
         "Ordered Qty",
         "Delivered Qty",
-        "Qty Variance"
+        "Qty Variance",
         "No. of Orders"
 
     ]
