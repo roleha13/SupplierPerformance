@@ -850,8 +850,11 @@ def create_article_summary(sheet, supplier_df, start_row):
     # Return ONLY article rows
     # -------------------------------------------------------------------------
 
-    return summary_row, summary_rows
-
+    return (
+        summary_row,
+        summary_rows,
+        article_summary
+    )
 ###############################################################################
 # HELPER TABLE
 ###############################################################################
@@ -1024,16 +1027,17 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         
         summary_start = start_row + len(kpis) + 4
 
-        article_start, summary_rows = create_article_summary(
-            sheet,
-            supplier_df,
-            summary_start
+        article_start, summary_rows, article_summary  = (
+            create_article_summary(
+                sheet,
+                supplier_df,
+                summary_start
+            )
         )
 
         add_supplier_chart(
             sheet,
-            article_start,
-            summary_rows
+            article_summary
         )
        
 
