@@ -1250,49 +1250,110 @@ def apply_conditional_formatting(ws):
 
 def add_supplier_chart(
     ws,
-    article_start,
-    summary_rows
+    article_summary
 ):
     """
-    Create an Ordered vs Delivered chart using the
-    Monthly Article Summary.
+    Creates an Ordered vs Delivered chart using the
+    article_summary DataFrame.
 
-    Because OpenPyXL cannot chart non-contiguous rows,
-    a hidden Chart Data table is first created from the
-    article summary rows.
+    A visible Chart Summary table is written first,
+    followed immediately by the chart.
     """
 
     # ---------------------------------------------------------
-    # CREATE HIDDEN CHART DATA TABLE
+    # CHART SUMMARY TITLE
     # ---------------------------------------------------------
 
-    chart_start = ws.max_row + 3
+    chart_title_row = ws.max_row + 3
 
-    ws.cell(chart_start, 1).value = "Chart Data"
-
-    chart_start += 1
-
-    ws.cell(chart_start, 1).value = "Article"
-    ws.cell(chart_start, 2).value = "Ordered Qty"
-    ws.cell(chart_start, 3).value = "Delivered Qty"
-
-    chart_row = chart_start + 1
-
-    for row in summary_rows:
-
-        ws.cell(chart_row, 1).value = ws.cell(row, 1).value
-        ws.cell(chart_row, 2).value = ws.cell(row, 2).value
-        ws.cell(chart_row, 3).value = ws.cell(row, 3).value
-
-        chart_row += 1
+    ws.cell(
+        chart_title_row,
+        1
+    ).value = "Ordered vs Delivered Summary"
 
     # ---------------------------------------------------------
-    # HIDE CHART DATA TABLE
+    # HEADERS
     # ---------------------------------------------------------
 
-    for r in range(chart_start - 1, chart_row):
+    header_row = chart_title_row + 1
 
-        ws.row_dimensions[r].hidden = True
+    headers = [
+        "Article",
+        "Ordered Qty",
+        "Delivered Qty"
+    ]
+
+    for col, header in enumerate(headers, start=1):
+
+        cell = ws.cell(
+            header_row,
+            col
+        )
+
+        cell.value = header
+
+        cell.fill = PatternFill(
+            fill_type="solid",
+            fgColor=HEADER_FILL
+        )
+
+        cell.font = Font(
+            bold=True,
+            color=HEADER_FONT
+        )
+
+        cell.alignment = Alignment(
+            horizontal="center"
+        )
+
+    # ---------------------------------------------------------
+    # WRITE SUMMARY DATA
+    # ---------------------------------------------------------
+
+    data_start = header_row + 1
+
+    current_row = data_start
+
+    for _, row in article_summary.iterrows():
+
+        ws.cell(
+            current_row,
+            1
+        ).value = row["Article"]
+
+        ws.cell(
+            current_row,
+            2
+        ).value = row["Ordered"]
+
+        ws.cell(
+            current_row,
+            3
+        ).value = row["Delivered"]
+
+        current_row += 1
+
+    # ---------------------------------------------------------
+    # TOTAL ROW
+    # ---------------------------------------------------------
+
+    ws.cell(current_row, 1).value = "TOTAL"
+
+    ws.cell(
+        current_row,
+        2
+    ).value = (
+        f"=SUM(B{data_start}:B{current_row-1})"
+    )
+
+    ws.cell(
+        current_row,
+        3
+    ).value = (
+        f"=SUM(C{data_start}:C{current_row-1})"
+    )
+
+    total_row = current_row
 
     # ---------------------------------------------------------
     # CREATE CHART
@@ -1300,25 +1361,37 @@ def add_supplier_chart(
 
     chart = BarChart()
 
+    chart.type = "col"
+
+    chart.style = 10
+
     chart.title = "Ordered vs Delivered by Article"
 
     chart.y_axis.title = "Quantity"
 
     chart.x_axis.title = "Article"
 
+    chart.height = 8
+
+    chart.width = 16
+
+    chart.dLbls = DataLabelList()
+
+    chart.dLbls.showVal = True
+
     data = Reference(
         ws,
         min_col=2,
         max_col=3,
-        min_row=chart_start,
-        max_row=chart_row - 1
+        min_row=header_row,
+        max_row=total_row - 1
     )
 
-    labels = Reference(
+    categories = Reference(
         ws,
         min_col=1,
-        min_row=chart_start + 1,
-        max_row=chart_row - 1
+        min_row=data_start,
+        max_row=total_row - 1
     )
 
     chart.add_data(
@@ -1326,23 +1399,19 @@ def add_supplier_chart(
         titles_from_data=True
     )
 
-    chart.set_categories(labels)
-
-    chart.height = 8
-
-    chart.width = 14
-
-    chart.dLbls = DataLabelList()
-
-    chart.dLbls.showVal = True
+    chart.set_categories(
+        categories
+    )
 
     # ---------------------------------------------------------
     # POSITION CHART
     # ---------------------------------------------------------
 
+    chart_row = total_row + 2
+
     ws.add_chart(
         chart,
-        f"F{chart_start}"
+        f"A{chart_row}"
     )
 
 ###############################################################################
