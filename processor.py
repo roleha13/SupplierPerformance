@@ -899,7 +899,7 @@ def create_helper_table(sheet, supplier_df, start_row):
 # SUPPLIER WORKSHEETS
 # =============================================================================
 
-def create_supplier_sheets(workbook, report_df):
+def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
     suppliers = sorted(
         report_df["Supplier"].unique()
@@ -937,6 +937,8 @@ def create_supplier_sheets(workbook, report_df):
 
         last_data_row = sheet.max_row
 
+        worksheet_last_rows[sheet.title] = last_data_row
+        
         # -----------------------------
         # HELPER TABLE
         # -----------------------------
@@ -1054,9 +1056,12 @@ def build_workbook(report_df):
         summary
     )
 
+    worksheet_last_rows = {}
+    
     create_supplier_sheets(
         wb,
-        report_df
+        report_df,
+        worksheet_last_rows,
     )
 
     return wb 
@@ -1547,10 +1552,17 @@ def process_files(
 
     for sheet in workbook.worksheets:
 
-        format_worksheet(sheet)
+        if sheet.title in worksheet_last_rows:
+
+            format_worksheet(
+
+                sheet,
+
+                worksheet_last_rows[sheet.title]
+
+            )
 
         apply_conditional_formatting(sheet)
-
     # ---------------------------------------------------------
     # Return workbook and report period
     # ---------------------------------------------------------
