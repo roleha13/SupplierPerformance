@@ -1062,13 +1062,20 @@ def build_workbook(report_df):
     return wb 
 
 ###############################################################################
-# EXCEL FORMATTING PART 3
+# EXCEL FORMATTING
 ###############################################################################
 
-def format_worksheet(ws):
+def format_worksheet(ws, last_data_row):
     """
-    Apply professional formatting.
+    Apply professional worksheet formatting.
+
+    Only the transaction table (rows 1 to last_data_row)
+    receives column-specific formatting.
     """
+
+    # -------------------------------------------------------------------------
+    # Styles
+    # -------------------------------------------------------------------------
 
     header_fill = PatternFill(
         fill_type="solid",
@@ -1083,40 +1090,54 @@ def format_worksheet(ws):
     thin = Side(style="thin")
 
     border = Border(
-
         left=thin,
-
         right=thin,
-
         top=thin,
-
         bottom=thin
-
     )
 
-    ws.freeze_panes = FREEZE_PANES
+    # -------------------------------------------------------------------------
+    # Worksheet settings
+    # -------------------------------------------------------------------------
 
-    ws.auto_filter.ref = ws.dimensions
+    ws.freeze_panes = FREEZE_PANES
+    ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}{last_data_row}"
+
+    # -------------------------------------------------------------------------
+    # Transaction Table Header
+    # -------------------------------------------------------------------------
 
     ws.row_dimensions[1].height = HEADER_ROW_HEIGHT
 
     for cell in ws[1]:
 
         cell.fill = header_fill
-
         cell.font = header_font
 
         cell.alignment = Alignment(
-
             horizontal="center",
-
             vertical="center"
-
         )
 
         cell.border = border
 
-    for row in ws.iter_rows(min_row=2):
+    # -------------------------------------------------------------------------
+    # Store transaction headers
+    # -------------------------------------------------------------------------
+
+    headers = {
+        cell.column: str(cell.value)
+        for cell in ws[1]
+    }
+
+    # -------------------------------------------------------------------------
+    # Format ONLY the transaction table
+    # -------------------------------------------------------------------------
+
+    for row in ws.iter_rows(
+        min_row=2,
+        max_row=last_data_row
+    ):
 
         ws.row_dimensions[row[0].row].height = DEFAULT_ROW_HEIGHT
 
@@ -1124,36 +1145,52 @@ def format_worksheet(ws):
 
             cell.border = border
 
-            if "Date" in str(ws.cell(1, cell.column).value):
+            header = headers.get(cell.column, "")
+
+            # Dates
+            if "Date" in header:
 
                 cell.number_format = "dd-mmm-yyyy"
 
-            elif "%" in str(ws.cell(1, cell.column).value):
+            # Percentages
+            elif "%" in header:
 
-                cell.number_format = '0.00%'
+                cell.number_format = "0.00%"
 
+            # Numbers
             elif isinstance(cell.value, (int, float)):
 
-                cell.number_format = '#,##0.00'
+                cell.number_format = "#,##0.00"
+
+    # -------------------------------------------------------------------------
+    # Auto-fit all columns
+    # -------------------------------------------------------------------------
 
     for column in ws.columns:
 
-        length = max(
+        max_length = 0
 
-            len(str(c.value))
+        column_letter = get_column_letter(column[0].column)
 
-            if c.value is not None else 0
+        for cell in column:
 
-            for c in column
+            try:
 
+                if cell.value is not None:
+
+                    max_length = max(
+                        max_length,
+                        len(str(cell.value))
+                    )
+
+            except Exception:
+
+                pass
+
+        ws.column_dimensions[column_letter].width = min(
+            max_length + 3,
+            40
         )
-
-        ws.column_dimensions[
-
-            get_column_letter(column[0].column)
-
-        ].width = min(length + 3, 40)
-
 
 ###############################################################################
 # CONDITIONAL FORMATTING
