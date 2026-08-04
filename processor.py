@@ -585,7 +585,7 @@ def create_executive_summary(df: pd.DataFrame) -> dict:
 
 from openpyxl.styles import Font
 
-def write_master_summary(workbook, summary_df):
+def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
     ws = workbook.create_sheet("Master Summary")
 
@@ -609,8 +609,13 @@ def write_master_summary(workbook, summary_df):
 
         supplier_name = str(supplier_cell.value)
 
+        sheet_name = supplier_sheet_map.get(
+            supplier_name,
+            supplier_name[:31]
+        )
+
         supplier_cell.hyperlink = (
-            f"#'{supplier_name[:31]}'!A1"
+            f"#'{sheet_name}'!A1"
         )
 
         supplier_cell.style = "Hyperlink"
@@ -907,12 +912,15 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
     suppliers = sorted(
         report_df["Supplier"].unique()
     )
+    supplier_sheet_map = {}
 
     for supplier in suppliers:
 
-        sheet = workbook.create_sheet(
-            supplier[:31]
-        )
+        sheet_name = supplier[:31]
+        
+        sheet = workbook.create_sheet(sheet_name)
+        
+        supplier_sheet_map[supplier] = sheet_name
 
         supplier_df = (
             report_df[
@@ -925,6 +933,8 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 ]
             )
         )
+        
+     return supplier_sheet_map
 
         # -----------------------------
         # Transaction Table
@@ -1051,24 +1061,28 @@ def build_workbook(report_df):
 
     wb.remove(wb.active)
 
+    worksheet_last_rows = {}
+
+    # Create supplier sheets FIRST
+    supplier_sheet_map = create_supplier_sheets(
+        wb,
+        report_df,
+        worksheet_last_rows
+    )
+
+    # Create the summary dataframe
     summary = create_master_summary(
         report_df
     )
 
+    # Now create the Master Summary
     write_master_summary(
         wb,
-        summary
+        summary,
+        supplier_sheet_map
     )
 
-    worksheet_last_rows = {}
-    
-    create_supplier_sheets(
-        wb,
-        report_df,
-        worksheet_last_rows,
-    )
-
-    return wb, worksheet_last_rows 
+    return wb, worksheet_last_rows
 
 ###############################################################################
 # EXCEL FORMATTING
