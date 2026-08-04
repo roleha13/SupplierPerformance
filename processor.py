@@ -1068,7 +1068,7 @@ def build_workbook(report_df):
         worksheet_last_rows,
     )
 
-    return wb 
+    return wb, worksheet_last_rows 
 
 ###############################################################################
 # EXCEL FORMATTING
@@ -1599,12 +1599,8 @@ def process_files(
     # Build workbook
     # ---------------------------------------------------------
 
-    workbook = build_workbook(
-
-        report_df
-
-    )
-
+    workbook, worksheet_last_rows = build_workbook(report_df)
+    
     # ---------------------------------------------------------
     # Add dashboard
     # ---------------------------------------------------------
