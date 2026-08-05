@@ -582,18 +582,50 @@ def create_executive_summary(df: pd.DataFrame) -> dict:
 # MASTER SUMMARY SHEET
 # =============================================================================
 
-
-from openpyxl.styles import Font
-
 def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
     ws = workbook.create_sheet("Master Summary")
+
+    # -----------------------------------------------------
+    # Styles
+    # -----------------------------------------------------
+
+    thin = Side(style="thin")
+
+    border = Border(
+        left=thin,
+        right=thin,
+        top=thin,
+        bottom=thin
+    )
+
+    header_fill = PatternFill(
+        fill_type="solid",
+        fgColor="1F4E78"
+    )
+
+    header_font = Font(
+        bold=True,
+        color="FFFFFF"
+    )
 
     # -----------------------------------------------------
     # Headers
     # -----------------------------------------------------
 
     ws.append(summary_df.columns.tolist())
+
+    # Format Header Row
+    for cell in ws[1]:
+
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = border
+
+        cell.alignment = Alignment(
+            horizontal="center",
+            vertical="center"
+        )
 
     # -----------------------------------------------------
     # Write Summary
@@ -604,6 +636,24 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
     for row in summary_df.itertuples(index=False):
 
         ws.append(list(row))
+
+        # ----------------------------------------
+        # Apply borders to entire row
+        # ----------------------------------------
+
+        for col in range(1, ws.max_column + 1):
+
+            cell = ws.cell(current_row, col)
+
+            cell.border = border
+
+            if isinstance(cell.value, (int, float)):
+
+                cell.number_format = "#,##0.00"
+
+        # ----------------------------------------
+        # Supplier Hyperlink
+        # ----------------------------------------
 
         supplier_cell = ws.cell(current_row, 1)
 
@@ -632,7 +682,7 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
     }
 
     # -----------------------------------------------------
-    # Format Order Fulfillment Rate as %
+    # Format Order Fulfillment Rate %
     # -----------------------------------------------------
 
     if "Order Fulfillment Rate %" in headers:
@@ -645,6 +695,21 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 row,
                 fulfillment_col
             ).number_format = "0.00%"
+
+    # -----------------------------------------------------
+    # Format Average Delivery Days
+    # -----------------------------------------------------
+
+    if "Average Delivery Days" in headers:
+
+        days_col = headers["Average Delivery Days"]
+
+        for row in range(2, ws.max_row + 1):
+
+            ws.cell(
+                row,
+                days_col
+            ).number_format = "0.0"
 
     return ws
 
