@@ -981,43 +981,43 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
     suppliers = sorted(
         report_df["Supplier"].unique()
     )
+
     supplier_sheet_map = {}
 
     for supplier in suppliers:
 
-       # ----------------------------------------
-       # Create a UNIQUE worksheet name
-       # ----------------------------------------
+        # ----------------------------------------
+        # Create a UNIQUE worksheet name
+        # ----------------------------------------
 
-       sheet_name = supplier[:31]
+        sheet_name = supplier[:31]
 
-       count = 1
+        count = 1
 
-       while sheet_name in workbook.sheetnames:
+        while sheet_name in workbook.sheetnames:
 
-           suffix = f"_{count}"
+            suffix = f"_{count}"
 
-           sheet_name = supplier[:31 - len(suffix)] + suffix
+            sheet_name = supplier[:31 - len(suffix)] + suffix
 
-           count += 1
+            count += 1
 
-       sheet = workbook.create_sheet(sheet_name)
+        sheet = workbook.create_sheet(sheet_name)
 
-       # Store the ACTUAL worksheet name
-       supplier_sheet_map[supplier] = sheet_name 
+        # Store the ACTUAL worksheet name
+        supplier_sheet_map[supplier] = sheet_name
 
-       supplier_df = (
-           report_df[
-               report_df["Supplier"] == supplier
-           ]
-           .sort_values(
-               [
-                   "Order Date",
-                   "Order No."
-               ]
+        supplier_df = (
+            report_df[
+                report_df["Supplier"] == supplier
+            ]
+            .sort_values(
+                [
+                    "Order Date",
+                    "Order No."
+                ]
             )
         )
-
 
         # -----------------------------
         # Transaction Table
@@ -1034,7 +1034,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         last_data_row = sheet.max_row
 
         worksheet_last_rows[sheet.title] = last_data_row
-        
+
         # -----------------------------
         # HELPER TABLE
         # -----------------------------
@@ -1059,7 +1059,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             "Supplier KPI Summary"
         )
 
-        kpis = supplier_kpis( 
+        kpis = supplier_kpis(
             supplier_df
         )
 
@@ -1117,10 +1117,14 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 )
 
                 value_cell.number_format = "0.0"
-        
+
+        # -----------------------------
+        # Monthly Article Summary
+        # -----------------------------
+
         summary_start = start_row + len(kpis) + 4
 
-        article_start, summary_rows, article_summary  = (
+        article_start, summary_rows, article_summary = (
             create_article_summary(
                 sheet,
                 supplier_df,
@@ -1128,11 +1132,15 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             )
         )
 
+        # -----------------------------
+        # Charts
+        # -----------------------------
+
         add_supplier_chart(
             sheet,
             article_summary
         )
-       
+
     return supplier_sheet_map
 
 # =============================================================================
