@@ -999,7 +999,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             )
         )
         
-     return supplier_sheet_map
+    return supplier_sheet_map
 
         # -----------------------------
         # Transaction Table
