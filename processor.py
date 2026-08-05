@@ -998,8 +998,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 ]
             )
         )
-        
-    return supplier_sheet_map
+
 
         # -----------------------------
         # Transaction Table
@@ -1115,6 +1114,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             article_summary
         )
        
+    return supplier_sheet_map
 
 # =============================================================================
 # BUILD WORKBOOK
