@@ -1436,8 +1436,6 @@ def add_supplier_chart(
 # MASTER DASHBOARD
 ###############################################################################
 
-from openpyxl.styles import Font
-
 def add_dashboard(master_ws, report_df):
     """
     Creates a live Executive Dashboard using Excel formulas
@@ -1457,6 +1455,42 @@ def add_dashboard(master_ws, report_df):
         size=16
     )
 
+    master_ws["A1"].fill = PatternFill(
+        fill_type="solid",
+        fgColor=HEADER_FILL
+    )
+
+    master_ws["A1"].font = Font(
+        bold=True,
+        size=16,
+        color=HEADER_FONT
+    )
+
+    master_ws.merge_cells("A1:B1")
+
+    master_ws["A1"].alignment = Alignment(
+        horizontal="center",
+        vertical="center"
+    )
+
+    # ---------------------------------------------------------
+    # Dashboard Styles
+    # ---------------------------------------------------------
+
+    thin = Side(style="thin")
+
+    border = Border(
+        left=thin,
+        right=thin,
+        top=thin,
+        bottom=thin
+    )
+
+    label_fill = PatternFill(
+        fill_type="solid",
+        fgColor="D9EAD3"
+    )
+
     # ---------------------------------------------------------
     # Locate Master Summary columns
     # ---------------------------------------------------------
@@ -1468,10 +1502,6 @@ def add_dashboard(master_ws, report_df):
 
     summary_last_row = master_ws.max_row
 
-    # Convert column numbers to Excel letters
-
-    from openpyxl.utils import get_column_letter
-
     supplier_col = get_column_letter(headers["Supplier"])
     orders_col = get_column_letter(headers["Orders"])
     ordered_col = get_column_letter(headers["Ordered Qty"])
@@ -1481,37 +1511,53 @@ def add_dashboard(master_ws, report_df):
     avg_days_col = get_column_letter(headers["Average Delivery Days"])
 
     # ---------------------------------------------------------
-    # Dashboard Labels
+    # Dashboard Labels & Formulas
     # ---------------------------------------------------------
 
     dashboard = [
 
-        ("Total Suppliers",
-         f"=COUNTA({supplier_col}12:{supplier_col}{summary_last_row})"),
+        (
+            "Total Suppliers",
+            f"=COUNTA({supplier_col}12:{supplier_col}{summary_last_row})"
+        ),
 
-        ("Total Orders",
-         f"=SUM({orders_col}12:{orders_col}{summary_last_row})"),
+        (
+            "Total Orders",
+            f"=SUM({orders_col}12:{orders_col}{summary_last_row})"
+        ),
 
-        ("Total Ordered Qty",
-         f"=SUM({ordered_col}12:{ordered_col}{summary_last_row})"),
+        (
+            "Total Ordered Qty",
+            f"=SUM({ordered_col}12:{ordered_col}{summary_last_row})"
+        ),
 
-        ("Total Received Qty",
-         f"=SUM({received_col}12:{received_col}{summary_last_row})"),
+        (
+            "Total Received Qty",
+            f"=SUM({received_col}12:{received_col}{summary_last_row})"
+        ),
 
-        ("Overall Order Fulfillment Rate",
-         f"=IF(SUM({ordered_col}12:{ordered_col}{summary_last_row})=0,"
-         f"0,"
-         f"SUM({received_col}12:{received_col}{summary_last_row})/"
-         f"SUM({ordered_col}12:{ordered_col}{summary_last_row}))"),
+        (
+            "Overall Order Fulfillment Rate",
+            f"=IF(SUM({ordered_col}12:{ordered_col}{summary_last_row})=0,"
+            f"0,"
+            f"SUM({received_col}12:{received_col}{summary_last_row})/"
+            f"SUM({ordered_col}12:{ordered_col}{summary_last_row}))"
+        ),
 
-        ("Average Delivery Days",
-         f"=AVERAGE({avg_days_col}12:{avg_days_col}{summary_last_row})"),
+        (
+            "Average Delivery Days",
+            f"=AVERAGE({avg_days_col}12:{avg_days_col}{summary_last_row})"
+        ),
 
-        ("Total Price Variance",
-         f"=SUM({price_var_col}12:{price_var_col}{summary_last_row})"),
+        (
+            "Total Price Variance",
+            f"=SUM({price_var_col}12:{price_var_col}{summary_last_row})"
+        ),
 
-        ("Total Quantity Variance",
-         f"=SUM({qty_var_col}12:{qty_var_col}{summary_last_row})")
+        (
+            "Total Quantity Variance",
+            f"=SUM({qty_var_col}12:{qty_var_col}{summary_last_row})"
+        )
 
     ]
 
@@ -1523,32 +1569,30 @@ def add_dashboard(master_ws, report_df):
 
     for label, formula in dashboard:
 
-        master_ws.cell(
-            start_row,
-            1
-        ).value = label
+        # Label Cell
+        label_cell = master_ws.cell(start_row, 1)
+        label_cell.value = label
+        label_cell.font = Font(bold=True)
+        label_cell.fill = label_fill
+        label_cell.border = border
 
-        value_cell = master_ws.cell(
-            start_row,
-            2
-        )
-
+        # Value Cell
+        value_cell = master_ws.cell(start_row, 2)
         value_cell.value = formula
+        value_cell.border = border
 
-        # Percentage formatting
+        # Number Formatting
         if "Fulfillment Rate" in label:
 
             value_cell.number_format = "0.00%"
 
-        # Decimal formatting
         elif "Average Delivery Days" in label:
 
             value_cell.number_format = "0.0"
 
-        # Quantity formatting
         else:
 
-            value_cell.number_format = '#,##0.00'
+            value_cell.number_format = "#,##0.00"
 
         start_row += 1
 
