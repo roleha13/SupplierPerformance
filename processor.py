@@ -664,12 +664,16 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
             supplier_name[:31]
         )
 
-        supplier_cell.hyperlink = (
-            f"#'{sheet_name}'!A1"
+        supplier_cell.hyperlink = f"#'{sheet_name}'!A1"
+        
+        # Hyperlink appearance without losing borders
+        supplier_cell.font = Font(
+            color="0563C1",
+            underline="single"
         )
 
-        supplier_cell.style = "Hyperlink"
-
+        supplier_cell.border = border
+        
         current_row += 1
 
     # -----------------------------------------------------
@@ -981,21 +985,36 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
     for supplier in suppliers:
 
-        sheet_name = supplier[:31]
-        
-        sheet = workbook.create_sheet(sheet_name)
-        
-        supplier_sheet_map[supplier] = sheet_name
+       # ----------------------------------------
+       # Create a UNIQUE worksheet name
+       # ----------------------------------------
 
-        supplier_df = (
-            report_df[
-                report_df["Supplier"] == supplier
-            ]
-            .sort_values(
-                [
-                    "Order Date",
-                    "Order No."
-                ]
+       sheet_name = supplier[:31]
+
+       count = 1
+
+       while sheet_name in workbook.sheetnames:
+
+           suffix = f"_{count}"
+
+           sheet_name = supplier[:31 - len(suffix)] + suffix
+
+           count += 1
+
+       sheet = workbook.create_sheet(sheet_name)
+
+       # Store the ACTUAL worksheet name
+       supplier_sheet_map[supplier] = sheet_name 
+
+       supplier_df = (
+           report_df[
+               report_df["Supplier"] == supplier
+           ]
+           .sort_values(
+               [
+                   "Order Date",
+                   "Order No."
+               ]
             )
         )
 
@@ -1146,6 +1165,15 @@ def build_workbook(report_df):
         summary,
         supplier_sheet_map
     )
+
+    # Move Master Summary to the first sheet
+    master = wb["Master Summary"]
+
+    wb._sheets.remove(master)
+    wb._sheets.insert(0, master)
+
+    # Make it the active sheet
+    wb.active = 0
 
     return wb, worksheet_last_rows
 
