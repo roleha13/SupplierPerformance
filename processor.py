@@ -518,10 +518,12 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
         by=[
             "Order Fulfillment Rate %",
             "Average Delivery Days"
+            "Orders"
         ],
         ascending=[
-            False,
-            True
+            False,  # highest fulfillment first
+            True,   # lowest delivery days first
+            False   # most orders first
         ],
         inplace=True
     )
@@ -704,7 +706,7 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
     # Format Average Delivery Days
     # -----------------------------------------------------
 
-    if "Average Delivery Days" in headers:
+    if "Average Delivery Days" in headers: 
 
         days_col = headers["Average Delivery Days"]
 
@@ -714,7 +716,10 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 row,
                 days_col
             ).number_format = "0.0"
-
+      
+      # Enable Filter
+      ws.auto_filter.ref = ws.dimensions 
+       
     return ws
 
 # =============================================================================
