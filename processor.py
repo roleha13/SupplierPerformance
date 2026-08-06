@@ -650,7 +650,6 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
             cell.border = border
 
             if isinstance(cell.value, (int, float)):
-
                 cell.number_format = "#,##0.00"
 
         # ----------------------------------------
@@ -667,7 +666,7 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         )
 
         supplier_cell.hyperlink = f"#'{sheet_name}'!A1"
-        
+
         # Hyperlink appearance without losing borders
         supplier_cell.font = Font(
             color="0563C1",
@@ -675,7 +674,7 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         )
 
         supplier_cell.border = border
-        
+
         current_row += 1
 
     # -----------------------------------------------------
@@ -706,7 +705,7 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
     # Format Average Delivery Days
     # -----------------------------------------------------
 
-    if "Average Delivery Days" in headers: 
+    if "Average Delivery Days" in headers:
 
         days_col = headers["Average Delivery Days"]
 
@@ -716,12 +715,20 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 row,
                 days_col
             ).number_format = "0.0"
-      
-      # Enable Filter
-      ws.auto_filter.ref = ws.dimensions 
-       
-    return ws
 
+    # -----------------------------------------------------
+    # Enable Filters
+    # -----------------------------------------------------
+
+    ws.auto_filter.ref = ws.dimensions
+
+    # -----------------------------------------------------
+    # Freeze Header Row
+    # -----------------------------------------------------
+
+    ws.freeze_panes = "A12"
+
+    return ws
 # =============================================================================
 # SUPPLIER KPI PANEL
 # =============================================================================
