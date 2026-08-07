@@ -667,11 +667,7 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         )
 
         # Create a true internal hyperlink
-        supplier_cell._hyperlink = Hyperlink(
-            ref=supplier_cell.coordinate,
-            location=f"'{sheet_name}'!A1",
-            display=supplier_name
-        )
+        supplier_cell.hyperlink = f"#{sheet_name}!A1"
 
         # Hyperlink appearance without losing borders
         supplier_cell.font = Font(
