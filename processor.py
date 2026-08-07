@@ -517,7 +517,7 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
     summary.sort_values(
         by=[
             "Order Fulfillment Rate %",
-            "Average Delivery Days"
+            "Average Delivery Days",
             "Orders"
         ],
         ascending=[
@@ -665,7 +665,12 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
             supplier_name[:31]
         )
 
-        supplier_cell.hyperlink = f"#'{sheet_name}'!A1"
+        # Create a true internal hyperlink
+        supplier_cell.hyperlink = Hyperlink(
+            ref=supplier_cell.coordinate,
+            location=f"'{sheet_name}'!A1",
+            display=supplier_name
+        )
 
         # Hyperlink appearance without losing borders
         supplier_cell.font = Font(
