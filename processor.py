@@ -590,6 +590,12 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
     ws = workbook.create_sheet("Master Summary")
 
     # -----------------------------------------------------
+    # Reserve rows 1-10 for Dashboard
+    # -----------------------------------------------------
+
+    START_ROW = 11
+
+    # -----------------------------------------------------
     # Styles
     # -----------------------------------------------------
 
@@ -613,44 +619,40 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
     )
 
     # -----------------------------------------------------
-    # Headers
+    # Write Header Row
     # -----------------------------------------------------
 
-    ws.append(summary_df.columns.tolist())
+    for col, header in enumerate(summary_df.columns, start=1):
 
-    # Format Header Row
-    for cell in ws[1]:
+        cell = ws.cell(START_ROW, col)
 
+        cell.value = header
         cell.fill = header_fill
         cell.font = header_font
         cell.border = border
-
         cell.alignment = Alignment(
             horizontal="center",
             vertical="center"
         )
 
+    ws.row_dimensions[START_ROW].height = HEADER_ROW_HEIGHT
+
     # -----------------------------------------------------
-    # Write Summary
+    # Write Summary Rows
     # -----------------------------------------------------
 
-    current_row = 2
+    current_row = START_ROW + 1
 
-    for row in summary_df.itertuples(index=False):
+    for record in summary_df.itertuples(index=False):
 
-        ws.append(list(row))
-
-        # ----------------------------------------
-        # Apply borders to entire row
-        # ----------------------------------------
-
-        for col in range(1, ws.max_column + 1):
+        for col, value in enumerate(record, start=1):
 
             cell = ws.cell(current_row, col)
 
+            cell.value = value
             cell.border = border
 
-            if isinstance(cell.value, (int, float)):
+            if isinstance(value, (int, float)):
                 cell.number_format = "#,##0.00"
 
         # ----------------------------------------
@@ -666,10 +668,8 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
             supplier_name[:31]
         )
 
-        # Create a true internal hyperlink
         supplier_cell.hyperlink = f"#'{sheet_name}'!A1"
 
-        # Hyperlink appearance without losing borders
         supplier_cell.font = Font(
             color="0563C1",
             underline="single"
@@ -685,18 +685,18 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
     headers = {
         cell.value: cell.column
-        for cell in ws[1]
+        for cell in ws[START_ROW]
     }
 
     # -----------------------------------------------------
-    # Format Order Fulfillment Rate %
+    # Format Percentage Column
     # -----------------------------------------------------
 
     if "Order Fulfillment Rate %" in headers:
 
         fulfillment_col = headers["Order Fulfillment Rate %"]
 
-        for row in range(2, ws.max_row + 1):
+        for row in range(START_ROW + 1, ws.max_row + 1):
 
             ws.cell(
                 row,
@@ -704,14 +704,14 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
             ).number_format = "0.00%"
 
     # -----------------------------------------------------
-    # Format Average Delivery Days
+    # Format Delivery Days
     # -----------------------------------------------------
 
     if "Average Delivery Days" in headers:
 
         days_col = headers["Average Delivery Days"]
 
-        for row in range(2, ws.max_row + 1):
+        for row in range(START_ROW + 1, ws.max_row + 1):
 
             ws.cell(
                 row,
@@ -719,16 +719,20 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
             ).number_format = "0.0"
 
     # -----------------------------------------------------
-    # Enable Filters
+    # Auto Filter
     # -----------------------------------------------------
 
-    ws.auto_filter.ref = ws.dimensions
+    last_col = get_column_letter(ws.max_column)
+
+    ws.auto_filter.ref = (
+        f"A{START_ROW}:{last_col}{ws.max_row}"
+    )
 
     # -----------------------------------------------------
-    # Freeze Header Row
+    # Freeze Panes
     # -----------------------------------------------------
 
-    ws.freeze_panes = "A12"
+    ws.freeze_panes = f"A{START_ROW + 1}"
 
     return ws
 # =============================================================================
@@ -1561,8 +1565,7 @@ def add_dashboard(master_ws, report_df):
     # Dashboard Title
     # ---------------------------------------------------------
 
-    master_ws.insert_rows(1, amount=10)
-
+    
     master_ws["A1"] = REPORT_TITLE
 
     master_ws["A1"].font = Font(
@@ -1780,7 +1783,7 @@ def process_files(
 
     master = workbook[MASTER_SHEET]
 
-    # add_dashboard(master, report_df)
+    add_dashboard(master, report_df)
 
     # ---------------------------------------------------------
     # Format worksheets
