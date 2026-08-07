@@ -1780,13 +1780,7 @@ def process_files(
 
     master = workbook[MASTER_SHEET]
 
-    add_dashboard(
-
-        master,
-
-        report_df
-
-    )
+    # add_dashboard(master, report_df)
 
     # ---------------------------------------------------------
     # Format worksheets
