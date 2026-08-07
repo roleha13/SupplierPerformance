@@ -25,6 +25,7 @@ from openpyxl.styles import (
 )
 
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.hyperlink import Hyperlink
 
 from openpyxl.chart import (
     BarChart,
