@@ -273,15 +273,24 @@ def merge_order_dates(
     Merge Order Date from Purchase Register into the
     Purchase Receiving Deviation report.
 
-    Prevents row multiplication by ensuring only one
-    Order Date exists per Order No.
+    Business Rule
+    -------------
+    A Purchase Order may contain multiple line items and,
+    therefore, may appear with more than one Order Date.
 
-    Ignores placeholder Order Numbers such as
-    'No PO defined', blank values, N/A, etc.
+    When a Purchase Order has multiple Order Dates, the
+    EARLIEST Order Date is used as the official PO Order Date.
+
+    This ensures Delivery Days is calculated from the first
+    date associated with the Purchase Order rather than from
+    an arbitrary row.
+
+    Invalid Order Numbers such as blank values, 'No PO defined',
+    'N/A', and 'NONE' are ignored.
     """
 
     # ---------------------------------------------------------
-    # Clean Order Numbers
+    # Clean Register
     # ---------------------------------------------------------
 
     register_df = register_df.copy()
@@ -291,6 +300,16 @@ def merge_order_dates(
         .fillna("")
         .astype(str)
         .str.strip()
+        .str.upper()
+    )
+
+    # ---------------------------------------------------------
+    # Clean Order Date
+    # ---------------------------------------------------------
+
+    register_df["Order Date"] = pd.to_datetime(
+        register_df["Order Date"],
+        errors="coerce"
     )
 
     # ---------------------------------------------------------
@@ -305,46 +324,110 @@ def merge_order_dates(
     }
 
     valid_register = register_df[
-        ~register_df["Order No."]
-        .str.upper()
-        .isin(invalid_orders)
+        ~register_df["Order No."].isin(invalid_orders)
     ].copy()
 
     # ---------------------------------------------------------
-    # Check for conflicting Order Dates
+    # Remove rows where Order Date is missing
     # ---------------------------------------------------------
 
-    conflicting = (
+    valid_register = valid_register[
+        valid_register["Order Date"].notna()
+    ].copy()
+
+    # ---------------------------------------------------------
+    # Identify POs with multiple Order Dates
+    # ---------------------------------------------------------
+
+    date_counts = (
         valid_register
         .groupby("Order No.")["Order Date"]
         .nunique()
     )
 
-    conflicting = conflicting[conflicting > 1]
+    conflicting_orders = date_counts[
+        date_counts > 1
+    ].index
 
-    if not conflicting.empty:
+    # ---------------------------------------------------------
+    # Handle multiple Order Dates
+    # ---------------------------------------------------------
 
-        conflicting_orders = ", ".join(conflicting.index.astype(str))
+    if len(conflicting_orders) > 0:
 
-        raise ValueError(
-            "Data quality issue detected.\n\n"
-            "The following Order Numbers have multiple "
-            f"Order Dates in the Purchase Register:\n\n"
-            f"{conflicting_orders}\n\n"
-            "Please verify the Purchase Register export."
+        print(
+            "\n=================================================="
+        )
+        print(
+            "MULTIPLE ORDER DATES DETECTED"
+        )
+        print(
+            "=================================================="
+        )
+
+        for order_no in conflicting_orders:
+
+            dates = (
+                valid_register.loc[
+                    valid_register["Order No."] == order_no,
+                    "Order Date"
+                ]
+                .dropna()
+                .sort_values()
+                .dt.strftime("%d-%b-%Y")
+                .unique()
+            )
+
+            selected_date = dates[0]
+
+            print(
+                f"PO: {order_no}"
+            )
+
+            print(
+                f"Available Order Dates: "
+                f"{', '.join(dates)}"
+            )
+
+            print(
+                f"Selected Order Date: "
+                f"{selected_date}"
+            )
+
+            print(
+                "Rule Applied: Earliest Order Date"
+            )
+
+            print(
+                "--------------------------------------------------"
+            )
+
+        print(
+            "==================================================\n"
         )
 
     # ---------------------------------------------------------
-    # Keep one Order Date per Order Number
+    # Create one Order Date per Purchase Order
+    #
+    # IMPORTANT:
+    # The earliest date is deliberately selected.
     # ---------------------------------------------------------
 
     order_lookup = (
-        valid_register[["Order No.", "Order Date"]]
-        .drop_duplicates(subset="Order No.")
+        valid_register
+        .groupby("Order No.", as_index=False)
+        .agg(
+            **{
+                "Order Date": (
+                    "Order Date",
+                    "min"
+                )
+            }
+        )
     )
 
     # ---------------------------------------------------------
-    # Merge
+    # Merge Order Date into Receiving Report
     # ---------------------------------------------------------
 
     merged = receiving_df.merge(
