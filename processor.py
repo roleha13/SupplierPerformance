@@ -707,18 +707,30 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
     for col, header in enumerate(summary_df.columns, start=1):
 
-        cell = ws.cell(START_ROW, col)
-
-        cell.value = header
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.border = border
-        cell.alignment = Alignment(
-            horizontal="center",
-            vertical="center"
+        cell = ws.cell(
+            START_ROW,
+            col
         )
 
-    ws.row_dimensions[START_ROW].height = HEADER_ROW_HEIGHT
+        cell.value = header
+
+        cell.fill = header_fill
+
+        cell.font = header_font
+
+        cell.border = border
+
+        cell.alignment = Alignment(
+            horizontal="center",
+            vertical="center",
+            wrap_text=True
+        )
+
+    # -----------------------------------------------------
+    # Give Header Row Enough Vertical Space
+    # -----------------------------------------------------
+
+    ws.row_dimensions[START_ROW].height = 35
 
     # -----------------------------------------------------
     # Write Summary Rows
@@ -730,28 +742,52 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
         for col, value in enumerate(record, start=1):
 
-            cell = ws.cell(current_row, col)
+            cell = ws.cell(
+                current_row,
+                col
+            )
 
             cell.value = value
+
             cell.border = border
 
+            # -------------------------------------------------
+            # Number Formatting
+            # -------------------------------------------------
+
             if isinstance(value, (int, float)):
+
                 cell.number_format = "#,##0.00"
 
-        # ----------------------------------------
+        # -----------------------------------------------------
         # Supplier Hyperlink
-        # ----------------------------------------
+        # -----------------------------------------------------
 
-        supplier_cell = ws.cell(current_row, 1)
+        supplier_cell = ws.cell(
+            current_row,
+            1
+        )
 
-        supplier_name = str(supplier_cell.value)
+        supplier_name = str(
+            supplier_cell.value
+        )
 
         sheet_name = supplier_sheet_map.get(
             supplier_name,
             supplier_name[:31]
         )
 
-        supplier_cell.hyperlink = f"#'{sheet_name}'!A1"
+        # -----------------------------------------------------
+        # Internal worksheet hyperlink
+        # -----------------------------------------------------
+
+        supplier_cell.hyperlink = (
+            f"#'{sheet_name}'!A1"
+        )
+
+        # -----------------------------------------------------
+        # Hyperlink appearance
+        # -----------------------------------------------------
 
         supplier_cell.font = Font(
             color="0563C1",
@@ -777,9 +813,14 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
     if "Order Fulfillment Rate %" in headers:
 
-        fulfillment_col = headers["Order Fulfillment Rate %"]
+        fulfillment_col = headers[
+            "Order Fulfillment Rate %"
+        ]
 
-        for row in range(START_ROW + 1, ws.max_row + 1):
+        for row in range(
+            START_ROW + 1,
+            ws.max_row + 1
+        ):
 
             ws.cell(
                 row,
@@ -792,9 +833,14 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
     if "Average Delivery Days" in headers:
 
-        days_col = headers["Average Delivery Days"]
+        days_col = headers[
+            "Average Delivery Days"
+        ]
 
-        for row in range(START_ROW + 1, ws.max_row + 1):
+        for row in range(
+            START_ROW + 1,
+            ws.max_row + 1
+        ):
 
             ws.cell(
                 row,
@@ -805,7 +851,9 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
     # Auto Filter
     # -----------------------------------------------------
 
-    last_col = get_column_letter(ws.max_column)
+    last_col = get_column_letter(
+        ws.max_column
+    )
 
     ws.auto_filter.ref = (
         f"A{START_ROW}:{last_col}{ws.max_row}"
@@ -817,7 +865,47 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
     ws.freeze_panes = f"A{START_ROW + 1}"
 
+    # -----------------------------------------------------
+    # Master Summary Column Widths
+    # -----------------------------------------------------
+
+    format_master_summary_columns(ws)
+
     return ws
+
+
+# =============================================================================
+# MASTER SUMMARY COLUMN WIDTHS
+# =============================================================================
+
+def format_master_summary_columns(ws):
+    """
+    Set professional column widths for the Master Summary sheet.
+
+    These widths accommodate both:
+    - The Dashboard in rows 1-10
+    - The Master Summary table beginning at row 11
+    """
+
+    column_widths = {
+
+        "A": 40,   # Supplier / Dashboard labels
+        "B": 18,   # Orders / Dashboard values
+        "C": 18,   # Ordered Qty
+        "D": 18,   # Received Qty
+        "E": 18,   # Qty Variance
+        "F": 20,   # Price Variance
+        "G": 25,   # Average Delivery Days
+        "H": 27    # Order Fulfillment Rate %
+    }
+
+    # ---------------------------------------------------------
+    # Apply column widths
+    # ---------------------------------------------------------
+
+    for column, width in column_widths.items():
+
+        ws.column_dimensions[column].width = width
 # =============================================================================
 # SUPPLIER KPI PANEL
 # =============================================================================
