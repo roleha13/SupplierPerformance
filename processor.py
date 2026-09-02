@@ -705,7 +705,10 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
     # Write Header Row
     # -----------------------------------------------------
 
-    for col, header in enumerate(summary_df.columns, start=1):
+    for col, header in enumerate(
+        summary_df.columns,
+        start=1
+    ):
 
         cell = ws.cell(
             START_ROW,
@@ -713,11 +716,8 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         )
 
         cell.value = header
-
         cell.fill = header_fill
-
         cell.font = header_font
-
         cell.border = border
 
         cell.alignment = Alignment(
@@ -733,14 +733,26 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
     ws.row_dimensions[START_ROW].height = 35
 
     # -----------------------------------------------------
-    # Write Summary Rows
+    # Write Supplier Names / Base Rows
     # -----------------------------------------------------
 
     current_row = START_ROW + 1
 
-    for record in summary_df.itertuples(index=False):
+    for record in summary_df.itertuples(
+        index=False
+    ):
 
-        for col, value in enumerate(record, start=1):
+        # -------------------------------------------------
+        # Write initial values
+        #
+        # These values will be replaced with formulas
+        # for the KPI columns below.
+        # -------------------------------------------------
+
+        for col, value in enumerate(
+            record,
+            start=1
+        ):
 
             cell = ws.cell(
                 current_row,
@@ -748,14 +760,12 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
             )
 
             cell.value = value
-
             cell.border = border
 
-            # -------------------------------------------------
-            # Number Formatting
-            # -------------------------------------------------
-
-            if isinstance(value, (int, float)):
+            if isinstance(
+                value,
+                (int, float)
+            ):
 
                 cell.number_format = "#,##0.00"
 
@@ -778,7 +788,9 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         )
 
         # -----------------------------------------------------
-        # Internal worksheet hyperlink
+        # IMPORTANT:
+        # Keep the existing working hyperlink approach.
+        # Do NOT use insert_rows() anywhere here.
         # -----------------------------------------------------
 
         supplier_cell.hyperlink = (
@@ -796,26 +808,340 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
         supplier_cell.border = border
 
+        # -----------------------------------------------------
+        # Move to next supplier
+        # -----------------------------------------------------
+
         current_row += 1
 
-    # -----------------------------------------------------
-    # Header Dictionary
-    # -----------------------------------------------------
+    # =========================================================
+    # LIVE FORMULAS
+    # =========================================================
+
+    # ---------------------------------------------------------
+    # Identify Master Summary Columns
+    # ---------------------------------------------------------
 
     headers = {
         cell.value: cell.column
         for cell in ws[START_ROW]
     }
 
-    # -----------------------------------------------------
-    # Format Percentage Column
-    # -----------------------------------------------------
+    supplier_col = headers.get(
+        "Supplier"
+    )
 
-    if "Order Fulfillment Rate %" in headers:
+    orders_col = headers.get(
+        "Orders"
+    )
 
-        fulfillment_col = headers[
-            "Order Fulfillment Rate %"
-        ]
+    ordered_col = headers.get(
+        "Ordered Qty"
+    )
+
+    received_col = headers.get(
+        "Received Qty"
+    )
+
+    qty_variance_col = headers.get(
+        "Qty Variance"
+    )
+
+    price_variance_col = headers.get(
+        "Price Variance"
+    )
+
+    avg_days_col = headers.get(
+        "Average Delivery Days"
+    )
+
+    fulfillment_col = headers.get(
+        "Order Fulfillment Rate %"
+    )
+
+    # ---------------------------------------------------------
+    # Loop through each supplier row
+    # ---------------------------------------------------------
+
+    for row in range(
+        START_ROW + 1,
+        ws.max_row + 1
+    ):
+
+        supplier_name = str(
+            ws.cell(
+                row,
+                supplier_col
+            ).value
+        )
+
+        sheet_name = supplier_sheet_map.get(
+            supplier_name
+        )
+
+        if not sheet_name:
+            continue
+
+        supplier_sheet = workbook[sheet_name]
+
+        # -----------------------------------------------------
+        # Find Supplier KPI Panel
+        # -----------------------------------------------------
+
+        kpi_title_row = None
+
+        for search_row in range(
+            1,
+            supplier_sheet.max_row + 1
+        ):
+
+            if (
+                supplier_sheet.cell(
+                    search_row,
+                    1
+                ).value
+                == "Supplier KPI Summary"
+            ):
+
+                kpi_title_row = search_row
+                break
+
+        # -----------------------------------------------------
+        # Safety Check
+        # -----------------------------------------------------
+
+        if kpi_title_row is None:
+            continue
+
+        # -----------------------------------------------------
+        # Find KPI Rows by Label
+        # -----------------------------------------------------
+
+        kpi_rows = {}
+
+        for search_row in range(
+            kpi_title_row + 1,
+            min(
+                kpi_title_row + 8,
+                supplier_sheet.max_row + 1
+            )
+        ):
+
+            kpi_name = supplier_sheet.cell(
+                search_row,
+                1
+            ).value
+
+            if kpi_name:
+                kpi_rows[str(kpi_name)] = search_row
+
+        # =====================================================
+        # ORDERS
+        # =====================================================
+
+        if (
+            orders_col
+            and "Orders" in kpi_rows
+        ):
+
+            source_row = kpi_rows["Orders"]
+
+            ws.cell(
+                row,
+                orders_col
+            ).value = (
+                f"='{sheet_name}'!B{source_row}"
+            )
+
+            ws.cell(
+                row,
+                orders_col
+            ).number_format = "0"
+
+        # =====================================================
+        # ORDERED QTY
+        # =====================================================
+
+        if (
+            ordered_col
+            and "Ordered Qty" in kpi_rows
+        ):
+
+            source_row = kpi_rows["Ordered Qty"]
+
+            ws.cell(
+                row,
+                ordered_col
+            ).value = (
+                f"='{sheet_name}'!B{source_row}"
+            )
+
+            ws.cell(
+                row,
+                ordered_col
+            ).number_format = "#,##0.00"
+
+        # =====================================================
+        # RECEIVED QTY
+        # =====================================================
+
+        if (
+            received_col
+            and "Received Qty" in kpi_rows
+        ):
+
+            source_row = kpi_rows["Received Qty"]
+
+            ws.cell(
+                row,
+                received_col
+            ).value = (
+                f"='{sheet_name}'!B{source_row}"
+            )
+
+            ws.cell(
+                row,
+                received_col
+            ).number_format = "#,##0.00"
+
+        # =====================================================
+        # QUANTITY VARIANCE
+        # =====================================================
+
+        if (
+            qty_variance_col
+            and "Quantity Variance" in kpi_rows
+        ):
+
+            source_row = kpi_rows[
+                "Quantity Variance"
+            ]
+
+            ws.cell(
+                row,
+                qty_variance_col
+            ).value = (
+                f"='{sheet_name}'!B{source_row}"
+            )
+
+            ws.cell(
+                row,
+                qty_variance_col
+            ).number_format = "#,##0.00"
+
+        # =====================================================
+        # PRICE VARIANCE
+        # =====================================================
+
+        if (
+            price_variance_col
+            and "Price Variance" in kpi_rows
+        ):
+
+            source_row = kpi_rows[
+                "Price Variance"
+            ]
+
+            ws.cell(
+                row,
+                price_variance_col
+            ).value = (
+                f"='{sheet_name}'!B{source_row}"
+            )
+
+            ws.cell(
+                row,
+                price_variance_col
+            ).number_format = "#,##0.00"
+
+        # =====================================================
+        # AVERAGE DELIVERY DAYS
+        # =====================================================
+
+        if (
+            avg_days_col
+            and "Average Delivery Days" in kpi_rows
+        ):
+
+            source_row = kpi_rows[
+                "Average Delivery Days"
+            ]
+
+            ws.cell(
+                row,
+                avg_days_col
+            ).value = (
+                f"='{sheet_name}'!B{source_row}"
+            )
+
+            ws.cell(
+                row,
+                avg_days_col
+            ).number_format = "0.0"
+
+        # =====================================================
+        # ORDER FULFILLMENT RATE
+        # =====================================================
+
+        if (
+            fulfillment_col
+            and ordered_col
+            and received_col
+        ):
+
+            ordered_letter = get_column_letter(
+                ordered_col
+            )
+
+            received_letter = get_column_letter(
+                received_col
+            )
+
+            ws.cell(
+                row,
+                fulfillment_col
+            ).value = (
+                f"=IF("
+                f"{ordered_letter}{row}=0,"
+                f"0,"
+                f"{received_letter}{row}/"
+                f"{ordered_letter}{row}"
+                f")"
+            )
+
+            ws.cell(
+                row,
+                fulfillment_col
+            ).number_format = "0.00%"
+
+    # =========================================================
+    # GENERAL FORMATTING
+    # =========================================================
+
+    # ---------------------------------------------------------
+    # Make sure all data cells retain borders
+    # ---------------------------------------------------------
+
+    for row in range(
+        START_ROW + 1,
+        ws.max_row + 1
+    ):
+
+        for col in range(
+            1,
+            ws.max_column + 1
+        ):
+
+            ws.cell(
+                row,
+                col
+            ).border = border
+
+    # ---------------------------------------------------------
+    # Percentage Column
+    # ---------------------------------------------------------
+
+    if fulfillment_col:
 
         for row in range(
             START_ROW + 1,
@@ -827,15 +1153,11 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 fulfillment_col
             ).number_format = "0.00%"
 
-    # -----------------------------------------------------
-    # Format Delivery Days
-    # -----------------------------------------------------
+    # ---------------------------------------------------------
+    # Delivery Days
+    # ---------------------------------------------------------
 
-    if "Average Delivery Days" in headers:
-
-        days_col = headers[
-            "Average Delivery Days"
-        ]
+    if avg_days_col:
 
         for row in range(
             START_ROW + 1,
@@ -844,36 +1166,37 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
             ws.cell(
                 row,
-                days_col
+                avg_days_col
             ).number_format = "0.0"
 
-    # -----------------------------------------------------
-    # Auto Filter
-    # -----------------------------------------------------
+    # =========================================================
+    # AUTO FILTER
+    # =========================================================
 
     last_col = get_column_letter(
         ws.max_column
     )
 
     ws.auto_filter.ref = (
-        f"A{START_ROW}:{last_col}{ws.max_row}"
+        f"A{START_ROW}:"
+        f"{last_col}{ws.max_row}"
     )
 
-    # -----------------------------------------------------
-    # Freeze Panes
-    # -----------------------------------------------------
+    # =========================================================
+    # FREEZE PANES
+    # =========================================================
 
-    ws.freeze_panes = f"A{START_ROW + 1}"
+    ws.freeze_panes = (
+        f"A{START_ROW + 1}"
+    )
 
-    # -----------------------------------------------------
-    # Master Summary Column Widths
-    # -----------------------------------------------------
+    # =========================================================
+    # MASTER SUMMARY COLUMN WIDTHS
+    # =========================================================
 
     format_master_summary_columns(ws)
 
     return ws
-
-
 # =============================================================================
 # MASTER SUMMARY COLUMN WIDTHS
 # =============================================================================
@@ -1124,26 +1447,55 @@ def create_article_summary(sheet, supplier_df, start_row):
 
 def create_helper_table(sheet, supplier_df, start_row):
     """
-    Creates a hidden helper table containing one row per Purchase Order.
-    Used for Excel KPI formulas.
+    Creates a hidden helper table containing one row per valid Purchase Order.
+
+    The helper table is used for:
+        - Orders count
+        - Average Delivery Days
+
+    AA = Order No.
+    AB = Delivery Days
+
+    One row is created for each unique Purchase Order.
     """
 
+    # -------------------------------------------------------------------------
+    # Prepare helper data
+    # -------------------------------------------------------------------------
+
     helper = (
-        supplier_df
-        .groupby("Order No.", as_index=False )
+        supplier_df[
+            supplier_df["Order No."].notna()
+            & ~supplier_df["Order No."].astype(str).str.strip().isin(
+                ["", "NO PO DEFINED", "N/A", "NONE"]
+            )
+        ]
+        .groupby("Order No.", as_index=False)
         .agg(
             Order_Date=("Order Date", "first"),
             Last_Delivery_Date=("Delivery Date", "max")
         )
     )
 
+    # -------------------------------------------------------------------------
+    # Calculate Delivery Days
+    # -------------------------------------------------------------------------
+
     helper["Delivery Days"] = (
         helper["Last_Delivery_Date"]
         - helper["Order_Date"]
     ).dt.days
 
+    # -------------------------------------------------------------------------
+    # Write Helper Table Headers
+    # -------------------------------------------------------------------------
+
     sheet.cell(start_row, 27).value = "Order No."
     sheet.cell(start_row, 28).value = "Delivery Days"
+
+    # -------------------------------------------------------------------------
+    # Write Helper Table Data
+    # -------------------------------------------------------------------------
 
     row = start_row + 1
 
@@ -1154,16 +1506,25 @@ def create_helper_table(sheet, supplier_df, start_row):
 
         row += 1
 
-    # Hide helper columns (AA = 27, AB = 28)
+    # -------------------------------------------------------------------------
+    # Hide Helper Columns
+    # -------------------------------------------------------------------------
+
+    # AA = column 27
+    # AB = column 28
+
     sheet.column_dimensions["AA"].hidden = True
     sheet.column_dimensions["AB"].hidden = True
 
+    # -------------------------------------------------------------------------
+    # Return Last Helper Row
+    # -------------------------------------------------------------------------
+
     return row - 1
 
-
-# =============================================================================
+###############################################################################
 # SUPPLIER WORKSHEETS
-# =============================================================================
+###############################################################################
 
 def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
@@ -1187,7 +1548,10 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
             suffix = f"_{count}"
 
-            sheet_name = supplier[:31 - len(suffix)] + suffix
+            sheet_name = (
+                supplier[:31 - len(suffix)]
+                + suffix
+            )
 
             count += 1
 
@@ -1218,17 +1582,205 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
         for row in supplier_df.itertuples(index=False):
 
-            sheet.append(list(row))
+            sheet.append(
+                list(row)
+            )
+
+        # ---------------------------------------------------------
+        # Last Transaction Row
+        # ---------------------------------------------------------
 
         last_data_row = sheet.max_row
 
+        # IMPORTANT:
+        # Keep worksheet_last_rows pointing ONLY to the transaction
+        # table. This ensures format_worksheet() does not format
+        # the TOTAL row, helper table, KPI panel, article summary,
+        # or charts as transaction data.
+
         worksheet_last_rows[sheet.title] = last_data_row
 
-        # -----------------------------
-        # HELPER TABLE
-        # -----------------------------
+        # =========================================================
+        # TOTAL ROW
+        # =========================================================
 
-        helper_start = last_data_row + 3
+        total_row = last_data_row + 1
+
+        sheet.cell(
+            total_row,
+            1
+        ).value = "TOTAL"
+
+        # ---------------------------------------------------------
+        # Locate Important Transaction Columns Dynamically
+        # ---------------------------------------------------------
+
+        transaction_headers = {
+            str(sheet.cell(1, col).value).strip(): col
+            for col in range(
+                1,
+                sheet.max_column + 1
+            )
+        }
+
+        ordered_col = transaction_headers.get("Ordered")
+        received_col = transaction_headers.get("Booked QTY")
+        qty_variance_col = transaction_headers.get("Variance QTY")
+        price_variance_col = transaction_headers.get("Variance Value")
+
+        # ---------------------------------------------------------
+        # TOTAL - Ordered Qty
+        # ---------------------------------------------------------
+
+        if ordered_col:
+
+            ordered_letter = get_column_letter(
+                ordered_col
+            )
+
+            sheet.cell(
+                total_row,
+                ordered_col
+            ).value = (
+                f"=SUM("
+                f"{ordered_letter}2:"
+                f"{ordered_letter}{last_data_row}"
+                f")"
+            )
+
+        # ---------------------------------------------------------
+        # TOTAL - Received Qty
+        # ---------------------------------------------------------
+
+        if received_col:
+
+            received_letter = get_column_letter(
+                received_col
+            )
+
+            sheet.cell(
+                total_row,
+                received_col
+            ).value = (
+                f"=SUM("
+                f"{received_letter}2:"
+                f"{received_letter}{last_data_row}"
+                f")"
+            )
+
+        # ---------------------------------------------------------
+        # TOTAL - Quantity Variance
+        # ---------------------------------------------------------
+
+        if qty_variance_col:
+
+            qty_variance_letter = get_column_letter(
+                qty_variance_col
+            )
+
+            sheet.cell(
+                total_row,
+                qty_variance_col
+            ).value = (
+                f"=SUM("
+                f"{qty_variance_letter}2:"
+                f"{qty_variance_letter}{last_data_row}"
+                f")"
+            )
+
+        # ---------------------------------------------------------
+        # TOTAL - Price Variance
+        # ---------------------------------------------------------
+
+        if price_variance_col:
+
+            price_variance_letter = get_column_letter(
+                price_variance_col
+            )
+
+            sheet.cell(
+                total_row,
+                price_variance_col
+            ).value = (
+                f"=SUM("
+                f"{price_variance_letter}2:"
+                f"{price_variance_letter}{last_data_row}"
+                f")"
+            )
+
+        # ---------------------------------------------------------
+        # TOTAL ROW FORMATTING
+        # ---------------------------------------------------------
+
+        thin = Side(style="thin")
+
+        total_border = Border(
+            left=thin,
+            right=thin,
+            top=thin,
+            bottom=thin
+        )
+
+        total_fill = PatternFill(
+            fill_type="solid",
+            fgColor=TOTAL_FILL
+        )
+
+        total_font = Font(
+            bold=True
+        )
+
+        for col in range(
+            1,
+            sheet.max_column + 1
+        ):
+
+            cell = sheet.cell(
+                total_row,
+                col
+            )
+
+            cell.fill = total_fill
+            cell.font = total_font
+            cell.border = total_border
+
+        # Number formatting for total values
+        if ordered_col:
+            sheet.cell(
+                total_row,
+                ordered_col
+            ).number_format = "#,##0.00"
+
+        if received_col:
+            sheet.cell(
+                total_row,
+                received_col
+            ).number_format = "#,##0.00"
+
+        if qty_variance_col:
+            sheet.cell(
+                total_row,
+                qty_variance_col
+            ).number_format = "#,##0.00"
+
+        if price_variance_col:
+            sheet.cell(
+                total_row,
+                price_variance_col
+            ).number_format = "#,##0.00"
+
+        # =========================================================
+        # HELPER TABLE
+        # =========================================================
+
+        # Keep the existing spacing:
+        #
+        # Data
+        # TOTAL
+        # blank row
+        # Helper Table
+
+        helper_start = total_row + 2
 
         helper_end = create_helper_table(
             sheet,
@@ -1236,9 +1788,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             helper_start
         )
 
-        # -----------------------------
+        # =========================================================
         # KPI PANEL
-        # -----------------------------
+        # =========================================================
 
         start_row = sheet.max_row + 3
 
@@ -1248,70 +1800,195 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             "Supplier KPI Summary"
         )
 
-        kpis = supplier_kpis(
-            supplier_df
-        )
+        # ---------------------------------------------------------
+        # KPI Labels
+        # ---------------------------------------------------------
 
-        for i, (kpi, value) in enumerate(
-            kpis,
-            start=start_row + 1
+        kpi_labels = [
+            "Orders",
+            "Ordered Qty",
+            "Received Qty",
+            "Order Fulfillment Rate %",
+            "Quantity Variance",
+            "Price Variance",
+            "Average Delivery Days"
+        ]
+
+        # ---------------------------------------------------------
+        # Write KPI Panel
+        # ---------------------------------------------------------
+
+        for offset, kpi in enumerate(
+            kpi_labels,
+            start=1
         ):
 
-            sheet.cell(i, 1).value = kpi
+            row = start_row + offset
 
-            value_cell = sheet.cell(i, 2)
+            sheet.cell(
+                row,
+                1
+            ).value = kpi
+
+            value_cell = sheet.cell(
+                row,
+                2
+            )
+
+            # -----------------------------------------------------
+            # Orders
+            # -----------------------------------------------------
 
             if kpi == "Orders":
 
-                value_cell.value = (
-                    f"=COUNTA(AA{helper_start+1}:AA{helper_end})"
-                )
+                if helper_end >= helper_start + 1:
+
+                    value_cell.value = (
+                        f"=COUNTA("
+                        f"AA{helper_start + 1}:"
+                        f"AA{helper_end}"
+                        f")"
+                    )
+
+                else:
+
+                    value_cell.value = 0
+
+            # -----------------------------------------------------
+            # Ordered Qty
+            # -----------------------------------------------------
 
             elif kpi == "Ordered Qty":
 
-                value_cell.value = (
-                    f"=SUM(H2:H{last_data_row})"
-                )
+                if ordered_col:
+
+                    ordered_letter = get_column_letter(
+                        ordered_col
+                    )
+
+                    value_cell.value = (
+                        f"={ordered_letter}{total_row}"
+                    )
+
+                else:
+
+                    value_cell.value = 0
+
+            # -----------------------------------------------------
+            # Received Qty
+            # -----------------------------------------------------
 
             elif kpi == "Received Qty":
 
-                value_cell.value = (
-                    f"=SUM(J2:J{last_data_row})"
-                )
+                if received_col:
 
-            elif kpi == "Quantity Variance":
+                    received_letter = get_column_letter(
+                        received_col
+                    )
 
-                value_cell.value = (
-                    f"=SUM(K2:K{last_data_row})"
-                )
+                    value_cell.value = (
+                        f"={received_letter}{total_row}"
+                    )
 
-            elif kpi == "Price Variance":
+                else:
 
-                value_cell.value = (
-                    f"=SUM(N2:N{last_data_row})"
-                )
+                    value_cell.value = 0
+
+            # -----------------------------------------------------
+            # Order Fulfillment Rate
+            # -----------------------------------------------------
 
             elif kpi == "Order Fulfillment Rate %":
 
+                # Ordered Qty is:
+                # start_row + 1
+                #
+                # Received Qty is:
+                # start_row + 2
+
                 value_cell.value = (
-                    f"=IF(B{start_row+2}=0,0,B{start_row+3}/B{start_row+2})"
+                    f"=IF("
+                    f"B{start_row + 1}=0,"
+                    f"0,"
+                    f"B{start_row + 2}/B{start_row + 1}"
+                    f")"
                 )
 
                 value_cell.number_format = "0.00%"
 
+            # -----------------------------------------------------
+            # Quantity Variance
+            # -----------------------------------------------------
+
+            elif kpi == "Quantity Variance":
+
+                if qty_variance_col:
+
+                    qty_variance_letter = get_column_letter(
+                        qty_variance_col
+                    )
+
+                    value_cell.value = (
+                        f"={qty_variance_letter}{total_row}"
+                    )
+
+                else:
+
+                    value_cell.value = 0
+
+            # -----------------------------------------------------
+            # Price Variance
+            # -----------------------------------------------------
+
+            elif kpi == "Price Variance":
+
+                if price_variance_col:
+
+                    price_variance_letter = get_column_letter(
+                        price_variance_col
+                    )
+
+                    value_cell.value = (
+                        f"={price_variance_letter}{total_row}"
+                    )
+
+                else:
+
+                    value_cell.value = 0
+
+            # -----------------------------------------------------
+            # Average Delivery Days
+            # -----------------------------------------------------
+
             elif kpi == "Average Delivery Days":
 
-                value_cell.value = (
-                    f"=AVERAGE(AB{helper_start+1}:AB{helper_end})"
-                )
+                if helper_end >= helper_start + 1:
+
+                    value_cell.value = (
+                        f"=IFERROR("
+                        f"AVERAGE("
+                        f"AB{helper_start + 1}:"
+                        f"AB{helper_end}"
+                        f"),"
+                        f"0"
+                        f")"
+                    )
+
+                else:
+
+                    value_cell.value = 0
 
                 value_cell.number_format = "0.0"
 
-        # -----------------------------
-        # Monthly Article Summary
-        # -----------------------------
+        # =========================================================
+        # MONTHLY ARTICLE SUMMARY
+        # =========================================================
 
-        summary_start = start_row + len(kpis) + 4
+        summary_start = (
+            start_row
+            + len(kpi_labels)
+            + 4
+        )
 
         article_start, summary_rows, article_summary = (
             create_article_summary(
@@ -1321,9 +1998,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             )
         )
 
-        # -----------------------------
-        # Charts
-        # -----------------------------
+        # =========================================================
+        # CHARTS
+        # =========================================================
 
         add_supplier_chart(
             sheet,
