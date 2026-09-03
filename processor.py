@@ -1908,9 +1908,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
                 value_cell.value = (
                     f"=IF("
-                    f"B{start_row + 1}=0,"
+                    f"B{start_row + 2}=0,"
                     f"0,"
-                    f"B{start_row + 2}/B{start_row + 1}"
+                    f"B{start_row + 3}/B{start_row + 2}"
                     f")"
                 )
 
