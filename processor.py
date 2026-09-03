@@ -1281,8 +1281,8 @@ def supplier_kpis(df: pd.DataFrame):
 
 def create_article_summary(sheet, supplier_df, start_row):
     """
-    Creates a pivot-style Monthly Article Summary with
-    expandable Order Number details.
+    Creates a professional pivot-style Monthly Article Summary
+    with expandable Order Number details.
 
     Returns
     -------
@@ -1290,150 +1290,374 @@ def create_article_summary(sheet, supplier_df, start_row):
         First row of the article summary table.
 
     summary_rows : list[int]
-        Worksheet row numbers containing ONLY the
-        article summary rows. Used for chart creation.
+        Worksheet row numbers containing ONLY the article summary rows.
+        Used for chart creation.
+
+    article_summary : pandas.DataFrame
+        Aggregated article-level summary data.
     """
 
     # -------------------------------------------------------------------------
-    # Title
+    # PROFESSIONAL TABLE STYLES
     # -------------------------------------------------------------------------
 
-    sheet.cell(start_row, 1).value = "Monthly Article Summary"
+    from openpyxl.styles import (
+        Font,
+        PatternFill,
+        Border,
+        Side,
+        Alignment
+    )
+
+    # Use the same colours already used elsewhere in your workbook
+    title_fill = PatternFill(
+        fill_type="solid",
+        fgColor=HEADER_FILL
+    )
+
+    header_fill = PatternFill(
+        fill_type="solid",
+        fgColor="D9EAD3"
+    )
+
+    detail_fill = PatternFill(
+        fill_type="solid",
+        fgColor="F7F7F7"
+    )
+
+    white_font = Font(
+        color=HEADER_FONT,
+        bold=True,
+        size=12
+    )
+
+    header_font = Font(
+        bold=True,
+        size=10
+    )
+
+    article_font = Font(
+        bold=False,
+        size=10
+    )
+
+    detail_font = Font(
+        italic=True,
+        size=9
+    )
+
+    thin_side = Side(
+        style="thin",
+        color="B7B7B7"
+    )
+
+    table_border = Border(
+        left=thin_side,
+        right=thin_side,
+        top=thin_side,
+        bottom=thin_side
+    )
+
+    # -------------------------------------------------------------------------
+    # TITLE
+    # -------------------------------------------------------------------------
+
+    title_row = start_row
+
+    # Merge title across the five article-summary columns
+    sheet.merge_cells(
+        start_row=title_row,
+        start_column=1,
+        end_row=title_row,
+        end_column=5
+    )
+
+    title_cell = sheet.cell(title_row, 1)
+    title_cell.value = "Monthly Article Summary"
+
+    title_cell.fill = title_fill
+    title_cell.font = white_font
+    title_cell.alignment = Alignment(
+        horizontal="left",
+        vertical="center"
+    )
+
+    sheet.row_dimensions[title_row].height = 24
+
+    # Apply title fill/borders across the full merged area
+    for col in range(1, 6):
+
+        cell = sheet.cell(title_row, col)
+
+        cell.fill = title_fill
+        cell.border = table_border
+
+    # -------------------------------------------------------------------------
+    # SPACE BETWEEN TITLE AND TABLE
+    # -------------------------------------------------------------------------
 
     start_row += 2
 
     # -------------------------------------------------------------------------
-    # Headers
+    # HEADERS
     # -------------------------------------------------------------------------
 
     headers = [
-
         "Article",
         "Ordered Qty",
         "Delivered Qty",
         "Qty Variance",
         "No. of Orders"
-
     ]
+
+    header_row = start_row
 
     for col, header in enumerate(headers, start=1):
 
-        sheet.cell(start_row, col).value = header
+        cell = sheet.cell(header_row, col)
 
-    summary_row = start_row + 1
+        cell.value = header
+
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = table_border
+
+        cell.alignment = Alignment(
+            horizontal="center",
+            vertical="center"
+        )
+
+    sheet.row_dimensions[header_row].height = 21
 
     # -------------------------------------------------------------------------
-    # Keep track of ONLY article rows
+    # FIRST ARTICLE DATA ROW
+    # -------------------------------------------------------------------------
+
+    summary_row = header_row + 1
+
+    # -------------------------------------------------------------------------
+    # KEEP TRACK OF ONLY ARTICLE ROWS
     # -------------------------------------------------------------------------
 
     summary_rows = []
 
     # -------------------------------------------------------------------------
-    # Monthly Article Totals
+    # MONTHLY ARTICLE TOTALS
     # -------------------------------------------------------------------------
 
     article_summary = (
-
         supplier_df
-
         .groupby("Article", as_index=False)
-
         .agg(
-
             Ordered=("Ordered", "sum"),
-
             Delivered=("Booked QTY", "sum"),
-
             Variance=("Variance QTY", "sum"),
-            
             Order_Frequency=("Order No.", "nunique")
-
         )
-
         .sort_values("Article")
-
     )
 
     current_row = summary_row
 
     # -------------------------------------------------------------------------
-    # Write each Article
+    # WRITE EACH ARTICLE
     # -------------------------------------------------------------------------
 
     for _, article in article_summary.iterrows():
 
         article_row = current_row
 
-        # -------------------------------------------------------------
-        # Summary Row
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
+        # ARTICLE SUMMARY ROW
+        # ---------------------------------------------------------------------
 
-        sheet.cell(current_row, 1).value = article["Article"]
-        sheet.cell(current_row, 2).value = article["Ordered"]
-        sheet.cell(current_row, 3).value = article["Delivered"]
-        sheet.cell(current_row, 4).value = article["Variance"]
+        article_cell = sheet.cell(current_row, 1)
+        article_cell.value = article["Article"]
 
-        freq_cell = sheet.cell(current_row, 5)
-        freq_cell.value = article["Order_Frequency"]
-        freq_cell.number_format = "0"
-        
-        # Save this row for charting
+        ordered_cell = sheet.cell(current_row, 2)
+        ordered_cell.value = article["Ordered"]
+
+        delivered_cell = sheet.cell(current_row, 3)
+        delivered_cell.value = article["Delivered"]
+
+        variance_cell = sheet.cell(current_row, 4)
+        variance_cell.value = article["Variance"]
+
+        frequency_cell = sheet.cell(current_row, 5)
+        frequency_cell.value = article["Order_Frequency"]
+
+        # ---------------------------------------------------------------------
+        # ARTICLE ROW FORMATTING
+        # ---------------------------------------------------------------------
+
+        for col in range(1, 6):
+
+            cell = sheet.cell(current_row, col)
+
+            cell.border = table_border
+            cell.font = article_font
+
+            cell.alignment = Alignment(
+                vertical="center"
+            )
+
+        # Article name left aligned
+        article_cell.alignment = Alignment(
+            horizontal="left",
+            vertical="center"
+        )
+
+        # Numbers right aligned
+        for col in range(2, 6):
+
+            sheet.cell(current_row, col).alignment = Alignment(
+                horizontal="right",
+                vertical="center"
+            )
+
+        # Number formatting
+        ordered_cell.number_format = "#,##0.00"
+        delivered_cell.number_format = "#,##0.00"
+        variance_cell.number_format = "#,##0.00"
+        frequency_cell.number_format = "0"
+
+        sheet.row_dimensions[current_row].height = 20
+
+        # Save ONLY article rows for charting
         summary_rows.append(current_row)
 
         current_row += 1
 
-        # -------------------------------------------------------------
-        # Order Detail Rows
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
+        # ORDER DETAIL ROWS
+        # ---------------------------------------------------------------------
 
         detail = (
-
             supplier_df[
                 supplier_df["Article"] == article["Article"]
             ]
-
             .sort_values(
                 [
                     "Order Date",
                     "Order No."
                 ]
             )
-
         )
 
         for _, order in detail.iterrows():
 
-            sheet.cell(
-                current_row,
-                1
-            ).value = "    " + str(order["Order No."])
+            # -------------------------------------------------------------
+            # Order Number
+            # -------------------------------------------------------------
 
-            sheet.cell(
-                current_row,
-                2
-            ).value = order["Ordered"]
+            detail_article = sheet.cell(current_row, 1)
 
-            sheet.cell(
-                current_row,
-                3
-            ).value = order["Booked QTY"]
+            detail_article.value = (
+                "    " + str(order["Order No."])
+            )
 
-            sheet.cell(
-                current_row,
-                4
-            ).value = order["Variance QTY"]
+            # -------------------------------------------------------------
+            # Quantities
+            # -------------------------------------------------------------
 
-            # Make order rows collapsible
+            detail_ordered = sheet.cell(current_row, 2)
+            detail_ordered.value = order["Ordered"]
+
+            detail_delivered = sheet.cell(current_row, 3)
+            detail_delivered.value = order["Booked QTY"]
+
+            detail_variance = sheet.cell(current_row, 4)
+            detail_variance.value = order["Variance QTY"]
+
+            # No. of Orders column intentionally left blank
+            sheet.cell(current_row, 5).value = None
+
+            # -------------------------------------------------------------
+            # Detail Row Formatting
+            # -------------------------------------------------------------
+
+            for col in range(1, 6):
+
+                cell = sheet.cell(current_row, col)
+
+                cell.fill = detail_fill
+                cell.border = table_border
+                cell.font = detail_font
+
+                cell.alignment = Alignment(
+                    vertical="center"
+                )
+
+            # Order number left aligned
+            detail_article.alignment = Alignment(
+                horizontal="left",
+                vertical="center",
+                indent=1
+            )
+
+            # Numeric values right aligned
+            for col in range(2, 5):
+
+                sheet.cell(current_row, col).alignment = Alignment(
+                    horizontal="right",
+                    vertical="center"
+                )
+
+            # Number formats
+            detail_ordered.number_format = "#,##0.00"
+            detail_delivered.number_format = "#,##0.00"
+            detail_variance.number_format = "#,##0.00"
+
+            # -------------------------------------------------------------
+            # Make Order Rows Collapsible
+            # -------------------------------------------------------------
+
             sheet.row_dimensions[current_row].outlineLevel = 1
             sheet.row_dimensions[current_row].hidden = True
+            sheet.row_dimensions[current_row].height = 18
 
             current_row += 1
 
-        # Collapse under article
+        # ---------------------------------------------------------------------
+        # COLLAPSE DETAILS UNDER ARTICLE
+        # ---------------------------------------------------------------------
+
         sheet.row_dimensions[article_row].collapsed = True
 
     # -------------------------------------------------------------------------
-    # Return ONLY article rows
+    # COLUMN WIDTHS
+    # -------------------------------------------------------------------------
+
+    # Set minimum professional widths.
+    # format_worksheet() may later auto-fit them if your existing code does so.
+
+    sheet.column_dimensions["A"].width = max(
+        sheet.column_dimensions["A"].width or 0,
+        28
+    )
+
+    sheet.column_dimensions["B"].width = max(
+        sheet.column_dimensions["B"].width or 0,
+        15
+    )
+
+    sheet.column_dimensions["C"].width = max(
+        sheet.column_dimensions["C"].width or 0,
+        16
+    )
+
+    sheet.column_dimensions["D"].width = max(
+        sheet.column_dimensions["D"].width or 0,
+        15
+    )
+
+    sheet.column_dimensions["E"].width = max(
+        sheet.column_dimensions["E"].width or 0,
+        15
+    )
+
+    # -------------------------------------------------------------------------
+    # RETURN ONLY ARTICLE ROWS
     # -------------------------------------------------------------------------
 
     return (
