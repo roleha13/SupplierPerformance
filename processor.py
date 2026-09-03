@@ -1536,9 +1536,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
     for supplier in suppliers:
 
-        # ----------------------------------------
-        # Create a UNIQUE worksheet name
-        # ----------------------------------------
+        # =========================================================
+        # CREATE A UNIQUE WORKSHEET NAME
+        # =========================================================
 
         sheet_name = supplier[:31]
 
@@ -1560,6 +1560,10 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         # Store the ACTUAL worksheet name
         supplier_sheet_map[supplier] = sheet_name
 
+        # =========================================================
+        # SUPPLIER DATA
+        # =========================================================
+
         supplier_df = (
             report_df[
                 report_df["Supplier"] == supplier
@@ -1572,9 +1576,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             )
         )
 
-        # -----------------------------
-        # Transaction Table
-        # -----------------------------
+        # =========================================================
+        # TRANSACTION TABLE
+        # =========================================================
 
         sheet.append(
             supplier_df.columns.tolist()
@@ -1586,9 +1590,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 list(row)
             )
 
-        # ---------------------------------------------------------
-        # Last Transaction Row
-        # ---------------------------------------------------------
+        # =========================================================
+        # LAST TRANSACTION ROW
+        # =========================================================
 
         last_data_row = sheet.max_row
 
@@ -1611,9 +1615,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             1
         ).value = "TOTAL"
 
-        # ---------------------------------------------------------
-        # Locate Important Transaction Columns Dynamically
-        # ---------------------------------------------------------
+        # =========================================================
+        # LOCATE IMPORTANT TRANSACTION COLUMNS DYNAMICALLY
+        # =========================================================
 
         transaction_headers = {
             str(sheet.cell(1, col).value).strip(): col
@@ -1623,14 +1627,25 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             )
         }
 
-        ordered_col = transaction_headers.get("Ordered")
-        received_col = transaction_headers.get("Booked QTY")
-        qty_variance_col = transaction_headers.get("Variance QTY")
-        price_variance_col = transaction_headers.get("Variance Value")
+        ordered_col = transaction_headers.get(
+            "Ordered"
+        )
 
-        # ---------------------------------------------------------
-        # TOTAL - Ordered Qty
-        # ---------------------------------------------------------
+        received_col = transaction_headers.get(
+            "Booked QTY"
+        )
+
+        qty_variance_col = transaction_headers.get(
+            "Variance QTY"
+        )
+
+        price_variance_col = transaction_headers.get(
+            "Variance Value"
+        )
+
+        # =========================================================
+        # TOTAL - ORDERED QTY
+        # =========================================================
 
         if ordered_col:
 
@@ -1648,9 +1663,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 f")"
             )
 
-        # ---------------------------------------------------------
-        # TOTAL - Received Qty
-        # ---------------------------------------------------------
+        # =========================================================
+        # TOTAL - RECEIVED QTY
+        # =========================================================
 
         if received_col:
 
@@ -1668,9 +1683,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 f")"
             )
 
-        # ---------------------------------------------------------
-        # TOTAL - Quantity Variance
-        # ---------------------------------------------------------
+        # =========================================================
+        # TOTAL - QUANTITY VARIANCE
+        # =========================================================
 
         if qty_variance_col:
 
@@ -1688,9 +1703,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 f")"
             )
 
-        # ---------------------------------------------------------
-        # TOTAL - Price Variance
-        # ---------------------------------------------------------
+        # =========================================================
+        # TOTAL - PRICE VARIANCE
+        # =========================================================
 
         if price_variance_col:
 
@@ -1708,9 +1723,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 f")"
             )
 
-        # ---------------------------------------------------------
+        # =========================================================
         # TOTAL ROW FORMATTING
-        # ---------------------------------------------------------
+        # =========================================================
 
         thin = Side(style="thin")
 
@@ -1744,26 +1759,33 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             cell.font = total_font
             cell.border = total_border
 
-        # Number formatting for total values
+        # =========================================================
+        # NUMBER FORMATTING FOR TOTAL VALUES
+        # =========================================================
+
         if ordered_col:
+
             sheet.cell(
                 total_row,
                 ordered_col
             ).number_format = "#,##0.00"
 
         if received_col:
+
             sheet.cell(
                 total_row,
                 received_col
             ).number_format = "#,##0.00"
 
         if qty_variance_col:
+
             sheet.cell(
                 total_row,
                 qty_variance_col
             ).number_format = "#,##0.00"
 
         if price_variance_col:
+
             sheet.cell(
                 total_row,
                 price_variance_col
@@ -1773,7 +1795,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         # HELPER TABLE
         # =========================================================
 
-        # Keep the existing spacing:
+        # Layout:
         #
         # Data
         # TOTAL
@@ -1794,15 +1816,113 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
         start_row = sheet.max_row + 3
 
-        sheet.cell(
-            start_row,
-            1,
-            "Supplier KPI Summary"
+        # ---------------------------------------------------------
+        # KPI PANEL STYLES
+        # ---------------------------------------------------------
+
+        kpi_border = Border(
+            left=thin,
+            right=thin,
+            top=thin,
+            bottom=thin
         )
 
-        # ---------------------------------------------------------
-        # KPI Labels
-        # ---------------------------------------------------------
+        kpi_title_fill = PatternFill(
+            fill_type="solid",
+            fgColor=HEADER_FILL
+        )
+
+        kpi_title_font = Font(
+            bold=True,
+            color=HEADER_FONT,
+            size=12
+        )
+
+        kpi_header_fill = PatternFill(
+            fill_type="solid",
+            fgColor="D9EAD3"
+        )
+
+        kpi_header_font = Font(
+            bold=True
+        )
+
+        # =========================================================
+        # KPI PANEL TITLE
+        # =========================================================
+
+        title_cell = sheet.cell(
+            start_row,
+            1
+        )
+
+        title_cell.value = "Supplier KPI Summary"
+
+        title_cell.fill = kpi_title_fill
+        title_cell.font = kpi_title_font
+        title_cell.alignment = Alignment(
+            horizontal="center",
+            vertical="center"
+        )
+        title_cell.border = kpi_border
+
+        # Apply title formatting to column B BEFORE merging
+        # so the highlighted title area covers the full A:B section.
+
+        title_value_cell = sheet.cell(
+            start_row,
+            2
+        )
+
+        title_value_cell.fill = kpi_title_fill
+        title_value_cell.border = kpi_border
+
+        # Merge title across two columns
+
+        sheet.merge_cells(
+            start_row=start_row,
+            start_column=1,
+            end_row=start_row,
+            end_column=2
+        )
+
+        sheet.row_dimensions[start_row].height = 24
+
+        # =========================================================
+        # KPI TABLE HEADERS
+        # =========================================================
+
+        kpi_header_row = start_row + 1
+
+        sheet.cell(
+            kpi_header_row,
+            1
+        ).value = "KPI"
+
+        sheet.cell(
+            kpi_header_row,
+            2
+        ).value = "Value"
+
+        for col in range(1, 3):
+
+            cell = sheet.cell(
+                kpi_header_row,
+                col
+            )
+
+            cell.fill = kpi_header_fill
+            cell.font = kpi_header_font
+            cell.border = kpi_border
+
+            cell.alignment = Alignment(
+                horizontal="center",
+                vertical="center"
+            )
+
+        # =========================================================
+        # KPI LABELS
+        # =========================================================
 
         kpi_labels = [
             "Orders",
@@ -1814,30 +1934,54 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             "Average Delivery Days"
         ]
 
-        # ---------------------------------------------------------
-        # Write KPI Panel
-        # ---------------------------------------------------------
+        # =========================================================
+        # WRITE KPI PANEL
+        # =========================================================
 
         for offset, kpi in enumerate(
             kpi_labels,
-            start=1
+            start=2
         ):
 
             row = start_row + offset
 
-            sheet.cell(
+            # -----------------------------------------------------
+            # KPI NAME
+            # -----------------------------------------------------
+
+            label_cell = sheet.cell(
                 row,
                 1
-            ).value = kpi
+            )
+
+            label_cell.value = kpi
+
+            label_cell.border = kpi_border
+
+            label_cell.alignment = Alignment(
+                horizontal="left",
+                vertical="center"
+            )
+
+            # -----------------------------------------------------
+            # KPI VALUE
+            # -----------------------------------------------------
 
             value_cell = sheet.cell(
                 row,
                 2
             )
 
-            # -----------------------------------------------------
-            # Orders
-            # -----------------------------------------------------
+            value_cell.border = kpi_border
+
+            value_cell.alignment = Alignment(
+                horizontal="right",
+                vertical="center"
+            )
+
+            # =====================================================
+            # ORDERS
+            # =====================================================
 
             if kpi == "Orders":
 
@@ -1854,9 +1998,11 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
                     value_cell.value = 0
 
-            # -----------------------------------------------------
-            # Ordered Qty
-            # -----------------------------------------------------
+                value_cell.number_format = "0"
+
+            # =====================================================
+            # ORDERED QTY
+            # =====================================================
 
             elif kpi == "Ordered Qty":
 
@@ -1874,9 +2020,11 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
                     value_cell.value = 0
 
-            # -----------------------------------------------------
-            # Received Qty
-            # -----------------------------------------------------
+                value_cell.number_format = "#,##0.00"
+
+            # =====================================================
+            # RECEIVED QTY
+            # =====================================================
 
             elif kpi == "Received Qty":
 
@@ -1894,31 +2042,53 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
                     value_cell.value = 0
 
-            # -----------------------------------------------------
-            # Order Fulfillment Rate
-            # -----------------------------------------------------
+                value_cell.number_format = "#,##0.00"
+
+            # =====================================================
+            # ORDER FULFILLMENT RATE
+            # =====================================================
 
             elif kpi == "Order Fulfillment Rate %":
 
-                # Ordered Qty is:
-                # start_row + 1
+                # -------------------------------------------------
+                # IMPORTANT:
                 #
-                # Received Qty is:
-                # start_row + 2
+                # Because the KPI HEADER ROW was added:
+                #
+                # start_row + 1 = KPI / Value header
+                # start_row + 2 = Orders
+                # start_row + 3 = Ordered Qty
+                # start_row + 4 = Received Qty
+                # start_row + 5 = Order Fulfillment Rate %
+                #
+                # Therefore:
+                #
+                # Ordered Qty = start_row + 3
+                # Received Qty = start_row + 4
+                #
+                # Formula:
+                #
+                # Received Qty / Ordered Qty
+                # -------------------------------------------------
+
+                ordered_kpi_row = start_row + 3
+
+                received_kpi_row = start_row + 4
 
                 value_cell.value = (
                     f"=IF("
-                    f"B{start_row + 2}=0,"
+                    f"B{ordered_kpi_row}=0,"
                     f"0,"
-                    f"B{start_row + 3}/B{start_row + 2}"
+                    f"B{received_kpi_row}/"
+                    f"B{ordered_kpi_row}"
                     f")"
                 )
 
                 value_cell.number_format = "0.00%"
 
-            # -----------------------------------------------------
-            # Quantity Variance
-            # -----------------------------------------------------
+            # =====================================================
+            # QUANTITY VARIANCE
+            # =====================================================
 
             elif kpi == "Quantity Variance":
 
@@ -1936,9 +2106,11 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
                     value_cell.value = 0
 
-            # -----------------------------------------------------
-            # Price Variance
-            # -----------------------------------------------------
+                value_cell.number_format = "#,##0.00"
+
+            # =====================================================
+            # PRICE VARIANCE
+            # =====================================================
 
             elif kpi == "Price Variance":
 
@@ -1956,9 +2128,11 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
                     value_cell.value = 0
 
-            # -----------------------------------------------------
-            # Average Delivery Days
-            # -----------------------------------------------------
+                value_cell.number_format = "#,##0.00"
+
+            # =====================================================
+            # AVERAGE DELIVERY DAYS
+            # =====================================================
 
             elif kpi == "Average Delivery Days":
 
@@ -1981,13 +2155,32 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 value_cell.number_format = "0.0"
 
         # =========================================================
+        # KPI COLUMN WIDTHS
+        # =========================================================
+
+        sheet.column_dimensions["A"].width = max(
+            sheet.column_dimensions["A"].width or 0,
+            30
+        )
+
+        sheet.column_dimensions["B"].width = max(
+            sheet.column_dimensions["B"].width or 0,
+            18
+        )
+
+        # =========================================================
         # MONTHLY ARTICLE SUMMARY
         # =========================================================
+
+        # IMPORTANT:
+        # Added one extra KPI header row.
+        #
+        # Therefore the article summary starts one row lower.
 
         summary_start = (
             start_row
             + len(kpi_labels)
-            + 4
+            + 5
         )
 
         article_start, summary_rows, article_summary = (
