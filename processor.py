@@ -1820,13 +1820,211 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
         last_data_row = sheet.max_row
 
+        # =========================================================
+        # IDENTIFY TRANSACTION COLUMNS DYNAMICALLY
+        # =========================================================
+
+        transaction_headers = {
+            str(sheet.cell(1, col).value).strip(): col
+            for col in range(
+                1,
+                sheet.max_column + 1
+            )
+        }
+
+        # ---------------------------------------------------------
+        # GET IMPORTANT TRANSACTION COLUMNS
+        # ---------------------------------------------------------
+
+        ordered_col = transaction_headers.get(
+            "Ordered"
+        )
+
+        booked_qty_col = transaction_headers.get(
+            "Booked QTY"
+        )
+
+        variance_qty_col = transaction_headers.get(
+            "Variance QTY"
+        )
+
+        po_price_col = transaction_headers.get(
+            "PO Price"
+        )
+
+        booked_price_col = transaction_headers.get(
+            "Booked Price"
+        )
+
+        variance_price_col = transaction_headers.get(
+            "Variance Price"
+        )
+
+        variance_value_col = transaction_headers.get(
+            "Variance Value"
+        )
+
+        # =========================================================
+        # GET COLUMN LETTERS
+        # =========================================================
+
+        ordered_letter = (
+            get_column_letter(ordered_col)
+            if ordered_col
+            else None
+        )
+
+        booked_qty_letter = (
+            get_column_letter(booked_qty_col)
+            if booked_qty_col
+            else None
+        )
+
+        variance_qty_letter = (
+            get_column_letter(variance_qty_col)
+            if variance_qty_col
+            else None
+        )
+
+        po_price_letter = (
+            get_column_letter(po_price_col)
+            if po_price_col
+            else None
+        )
+
+        booked_price_letter = (
+            get_column_letter(booked_price_col)
+            if booked_price_col
+            else None
+        )
+
+        variance_price_letter = (
+            get_column_letter(variance_price_col)
+            if variance_price_col
+            else None
+        )
+
+        variance_value_letter = (
+            get_column_letter(variance_value_col)
+            if variance_value_col
+            else None
+        )
+
+        # =========================================================
+        # LIVE TRANSACTION FORMULAS
+        #
+        # These calculations are performed directly in Excel.
+        #
+        # Variance QTY
+        #     = Ordered - Booked QTY
+        #
+        # Variance Price
+        #     = Booked Price - PO Price
+        #
+        # Variance Value
+        #     = Variance QTY × PO Price
+        #
+        # IMPORTANT:
+        # "Variance Value" is the monetary variance used by the
+        # TOTAL row and Supplier KPI Summary.
+        # =========================================================
+
+        for row_num in range(
+            2,
+            last_data_row + 1
+        ):
+
+            # -----------------------------------------------------
+            # QUANTITY VARIANCE
+            # Ordered - Booked QTY
+            # -----------------------------------------------------
+
+            if (
+                variance_qty_col
+                and ordered_letter
+                and booked_qty_letter
+            ):
+
+                sheet.cell(
+                    row_num,
+                    variance_qty_col
+                ).value = (
+                    f"={ordered_letter}{row_num}"
+                    f"-{booked_qty_letter}{row_num}"
+                )
+
+                sheet.cell(
+                    row_num,
+                    variance_qty_col
+                ).number_format = "#,##0.00"
+
+            # -----------------------------------------------------
+            # PRICE VARIANCE
+            # Booked Price - PO Price
+            #
+            # This remains a separate unit-price calculation.
+            # It is NOT used as the KPI monetary variance.
+            # -----------------------------------------------------
+
+            if (
+                variance_price_col
+                and booked_price_letter
+                and po_price_letter
+            ):
+
+                sheet.cell(
+                    row_num,
+                    variance_price_col
+                ).value = (
+                    f"={booked_price_letter}{row_num}"
+                    f"-{po_price_letter}{row_num}"
+                )
+
+                sheet.cell(
+                    row_num,
+                    variance_price_col
+                ).number_format = "#,##0.00"
+
+            # -----------------------------------------------------
+            # VARIANCE VALUE
+            #
+            # Quantity Variance × PO Price
+            #
+            # THIS is the monetary variance used by the KPI.
+            # -----------------------------------------------------
+
+            if (
+                variance_value_col
+                and variance_qty_letter
+                and po_price_letter
+            ):
+
+                sheet.cell(
+                    row_num,
+                    variance_value_col
+                ).value = (
+                    f"={variance_qty_letter}{row_num}"
+                    f"*{po_price_letter}{row_num}"
+                )
+
+                sheet.cell(
+                    row_num,
+                    variance_value_col
+                ).number_format = "#,##0.00"
+
+        # =========================================================
         # IMPORTANT:
         # Keep worksheet_last_rows pointing ONLY to the transaction
-        # table. This ensures format_worksheet() does not format
-        # the TOTAL row, helper table, KPI panel, article summary,
-        # or charts as transaction data.
+        # table.
+        #
+        # This ensures format_worksheet() does not format the TOTAL
+        # row, helper table, KPI panel, article summary, or charts
+        # as transaction data.
+        # =========================================================
 
-        worksheet_last_rows[sheet.title] = last_data_row
+        worksheet_last_rows[
+            sheet.title
+        ] = last_data_row
 
         # =========================================================
         # TOTAL ROW
@@ -1840,42 +2038,10 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         ).value = "TOTAL"
 
         # =========================================================
-        # LOCATE IMPORTANT TRANSACTION COLUMNS DYNAMICALLY
-        # =========================================================
-
-        transaction_headers = {
-            str(sheet.cell(1, col).value).strip(): col
-            for col in range(
-                1,
-                sheet.max_column + 1
-            )
-        }
-
-        ordered_col = transaction_headers.get(
-            "Ordered"
-        )
-
-        received_col = transaction_headers.get(
-            "Booked QTY"
-        )
-
-        qty_variance_col = transaction_headers.get(
-            "Variance QTY"
-        )
-
-        price_variance_col = transaction_headers.get(
-            "Variance Value"
-        )
-
-        # =========================================================
         # TOTAL - ORDERED QTY
         # =========================================================
 
         if ordered_col:
-
-            ordered_letter = get_column_letter(
-                ordered_col
-            )
 
             sheet.cell(
                 total_row,
@@ -1891,19 +2057,15 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         # TOTAL - RECEIVED QTY
         # =========================================================
 
-        if received_col:
-
-            received_letter = get_column_letter(
-                received_col
-            )
+        if booked_qty_col:
 
             sheet.cell(
                 total_row,
-                received_col
+                booked_qty_col
             ).value = (
                 f"=SUM("
-                f"{received_letter}2:"
-                f"{received_letter}{last_data_row}"
+                f"{booked_qty_letter}2:"
+                f"{booked_qty_letter}{last_data_row}"
                 f")"
             )
 
@@ -1911,39 +2073,54 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         # TOTAL - QUANTITY VARIANCE
         # =========================================================
 
-        if qty_variance_col:
-
-            qty_variance_letter = get_column_letter(
-                qty_variance_col
-            )
+        if variance_qty_col:
 
             sheet.cell(
                 total_row,
-                qty_variance_col
+                variance_qty_col
             ).value = (
                 f"=SUM("
-                f"{qty_variance_letter}2:"
-                f"{qty_variance_letter}{last_data_row}"
+                f"{variance_qty_letter}2:"
+                f"{variance_qty_letter}{last_data_row}"
                 f")"
             )
 
         # =========================================================
-        # TOTAL - PRICE VARIANCE
+        # TOTAL - VARIANCE VALUE
+        #
+        # IMPORTANT:
+        # This is the monetary variance used by the KPI and
+        # Master Summary.
         # =========================================================
 
-        if price_variance_col:
-
-            price_variance_letter = get_column_letter(
-                price_variance_col
-            )
+        if variance_value_col:
 
             sheet.cell(
                 total_row,
-                price_variance_col
+                variance_value_col
             ).value = (
                 f"=SUM("
-                f"{price_variance_letter}2:"
-                f"{price_variance_letter}{last_data_row}"
+                f"{variance_value_letter}2:"
+                f"{variance_value_letter}{last_data_row}"
+                f")"
+            )
+
+        # =========================================================
+        # TOTAL - VARIANCE PRICE
+        #
+        # This is retained as a separate informational total.
+        # It does NOT replace Variance Value.
+        # =========================================================
+
+        if variance_price_col:
+
+            sheet.cell(
+                total_row,
+                variance_price_col
+            ).value = (
+                f"=SUM("
+                f"{variance_price_letter}2:"
+                f"{variance_price_letter}{last_data_row}"
                 f")"
             )
 
@@ -1951,7 +2128,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         # TOTAL ROW FORMATTING
         # =========================================================
 
-        thin = Side(style="thin")
+        thin = Side(
+            style="thin"
+        )
 
         total_border = Border(
             left=thin,
@@ -1984,7 +2163,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             cell.border = total_border
 
         # =========================================================
-        # NUMBER FORMATTING FOR TOTAL VALUES
+        # TOTAL NUMBER FORMATTING
         # =========================================================
 
         if ordered_col:
@@ -1994,25 +2173,32 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 ordered_col
             ).number_format = "#,##0.00"
 
-        if received_col:
+        if booked_qty_col:
 
             sheet.cell(
                 total_row,
-                received_col
+                booked_qty_col
             ).number_format = "#,##0.00"
 
-        if qty_variance_col:
+        if variance_qty_col:
 
             sheet.cell(
                 total_row,
-                qty_variance_col
+                variance_qty_col
             ).number_format = "#,##0.00"
 
-        if price_variance_col:
+        if variance_price_col:
 
             sheet.cell(
                 total_row,
-                price_variance_col
+                variance_price_col
+            ).number_format = "#,##0.00"
+
+        if variance_value_col:
+
+            sheet.cell(
+                total_row,
+                variance_value_col
             ).number_format = "#,##0.00"
 
         # =========================================================
@@ -2080,18 +2266,23 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             1
         )
 
-        title_cell.value = "Supplier KPI Summary"
+        title_cell.value = (
+            "Supplier KPI Summary"
+        )
 
         title_cell.fill = kpi_title_fill
         title_cell.font = kpi_title_font
+
         title_cell.alignment = Alignment(
             horizontal="center",
             vertical="center"
         )
+
         title_cell.border = kpi_border
 
-        # Apply title formatting to column B BEFORE merging
-        # so the highlighted title area covers the full A:B section.
+        # ---------------------------------------------------------
+        # APPLY TITLE FORMATTING TO COLUMN B BEFORE MERGING
+        # ---------------------------------------------------------
 
         title_value_cell = sheet.cell(
             start_row,
@@ -2101,7 +2292,9 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         title_value_cell.fill = kpi_title_fill
         title_value_cell.border = kpi_border
 
-        # Merge title across two columns
+        # ---------------------------------------------------------
+        # MERGE TITLE ACROSS A:B
+        # ---------------------------------------------------------
 
         sheet.merge_cells(
             start_row=start_row,
@@ -2110,7 +2303,37 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             end_column=2
         )
 
-        sheet.row_dimensions[start_row].height = 24
+        sheet.row_dimensions[
+            start_row
+        ].height = 24
+
+        # =========================================================
+        # BACK TO MASTER SUMMARY LINK
+        # =========================================================
+
+        navigation_cell = sheet.cell(
+            start_row,
+            4
+        )
+
+        navigation_cell.value = (
+            "← Back to Master Summary"
+        )
+
+        navigation_cell.hyperlink = (
+            "#'Master Summary'!A1"
+        )
+
+        navigation_cell.font = Font(
+            bold=True,
+            color="0563C1",
+            underline="single"
+        )
+
+        navigation_cell.alignment = Alignment(
+            horizontal="right",
+            vertical="center"
+        )
 
         # =========================================================
         # KPI TABLE HEADERS
@@ -2154,7 +2377,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             "Received Qty",
             "Order Fulfillment Rate %",
             "Quantity Variance",
-            "Price Variance",
+            "Variance Value",
             "Average Delivery Days"
         ]
 
@@ -2179,7 +2402,6 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             )
 
             label_cell.value = kpi
-
             label_cell.border = kpi_border
 
             label_cell.alignment = Alignment(
@@ -2232,10 +2454,6 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
                 if ordered_col:
 
-                    ordered_letter = get_column_letter(
-                        ordered_col
-                    )
-
                     value_cell.value = (
                         f"={ordered_letter}{total_row}"
                     )
@@ -2252,14 +2470,10 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
             elif kpi == "Received Qty":
 
-                if received_col:
-
-                    received_letter = get_column_letter(
-                        received_col
-                    )
+                if booked_qty_col:
 
                     value_cell.value = (
-                        f"={received_letter}{total_row}"
+                        f"={booked_qty_letter}{total_row}"
                     )
 
                 else:
@@ -2274,30 +2488,21 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
             elif kpi == "Order Fulfillment Rate %":
 
-                # -------------------------------------------------
-                # IMPORTANT:
-                #
-                # Because the KPI HEADER ROW was added:
+                # Because the KPI header row was added:
                 #
                 # start_row + 1 = KPI / Value header
                 # start_row + 2 = Orders
                 # start_row + 3 = Ordered Qty
                 # start_row + 4 = Received Qty
                 # start_row + 5 = Order Fulfillment Rate %
-                #
-                # Therefore:
-                #
-                # Ordered Qty = start_row + 3
-                # Received Qty = start_row + 4
-                #
-                # Formula:
-                #
-                # Received Qty / Ordered Qty
-                # -------------------------------------------------
 
-                ordered_kpi_row = start_row + 3
+                ordered_kpi_row = (
+                    start_row + 3
+                )
 
-                received_kpi_row = start_row + 4
+                received_kpi_row = (
+                    start_row + 4
+                )
 
                 value_cell.value = (
                     f"=IF("
@@ -2316,14 +2521,10 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
             elif kpi == "Quantity Variance":
 
-                if qty_variance_col:
-
-                    qty_variance_letter = get_column_letter(
-                        qty_variance_col
-                    )
+                if variance_qty_col:
 
                     value_cell.value = (
-                        f"={qty_variance_letter}{total_row}"
+                        f"={variance_qty_letter}{total_row}"
                     )
 
                 else:
@@ -2333,19 +2534,21 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 value_cell.number_format = "#,##0.00"
 
             # =====================================================
-            # PRICE VARIANCE
+            # VARIANCE VALUE
+            #
+            # IMPORTANT:
+            # The KPI is explicitly called "Variance Value".
+            #
+            # It references the TOTAL of the "Variance Value"
+            # transaction column.
             # =====================================================
 
-            elif kpi == "Price Variance":
+            elif kpi == "Variance Value":
 
-                if price_variance_col:
-
-                    price_variance_letter = get_column_letter(
-                        price_variance_col
-                    )
+                if variance_value_col:
 
                     value_cell.value = (
-                        f"={price_variance_letter}{total_row}"
+                        f"={variance_value_letter}{total_row}"
                     )
 
                 else:
@@ -2392,11 +2595,15 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             18
         )
 
+        sheet.column_dimensions["D"].width = max(
+            sheet.column_dimensions["D"].width or 0,
+            28
+        )
+
         # =========================================================
         # MONTHLY ARTICLE SUMMARY
         # =========================================================
 
-        # IMPORTANT:
         # Added one extra KPI header row.
         #
         # Therefore the article summary starts one row lower.
@@ -2425,7 +2632,6 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         )
 
     return supplier_sheet_map
-
 # =============================================================================
 # BUILD WORKBOOK
 # =============================================================================
