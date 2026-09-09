@@ -507,12 +507,23 @@ def prepare_report_data(
 def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
     """
     Create supplier performance summary.
-    Average Delivery Days is calculated per unique
-    Purchase Order instead of per article line.
+
+    KPIs:
+        - Orders
+        - Ordered Qty
+        - Received Qty
+        - Qty Variance
+        - Variance Value
+        - Average Delivery Days
+        - Order Fulfillment Rate %
+
+    Average Delivery Days is calculated once per unique
+    Purchase Order instead of once per article line.
     """
 
     # -------------------------------------------------------------------------
-    # Delivery Days (One record per Purchase Order)
+    # Delivery Days
+    # One record per Purchase Order
     # -------------------------------------------------------------------------
 
     delivery_summary = (
@@ -536,13 +547,35 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
     # -------------------------------------------------------------------------
 
     summary = (
-        df.groupby("Supplier", as_index=False)
+        df.groupby(
+            "Supplier",
+            as_index=False
+        )
         .agg(
             Orders=("Order No.", "nunique"),
-            Ordered_Qty=("Ordered", "sum"),
-            Received_Qty=("Booked QTY", "sum"),
-            Qty_Variance=("Variance QTY", "sum"),
-            Price_Variance=("Variance Value", "sum")
+
+            Ordered_Qty=(
+                "Ordered",
+                "sum"
+            ),
+
+            Received_Qty=(
+                "Booked QTY",
+                "sum"
+            ),
+
+            Qty_Variance=(
+                "Variance QTY",
+                "sum"
+            ),
+
+            # IMPORTANT:
+            # This is the monetary value of the quantity variance.
+            # It is NOT unit price variance.
+            Variance_Value=(
+                "Variance Value",
+                "sum"
+            )
         )
     )
 
@@ -562,10 +595,14 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
 
     summary["Order Fulfillment Rate %"] = (
         (
-            summary["Received_Qty"] /
+            summary["Received_Qty"]
+            /
             summary["Ordered_Qty"]
         )
-        .replace([float("inf")], 0)
+        .replace(
+            [float("inf")],
+            0
+        )
         .fillna(0)
         .round(4)
     )
@@ -576,11 +613,20 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
 
     summary.rename(
         columns={
-            "Ordered_Qty": "Ordered Qty",
-            "Received_Qty": "Received Qty",
-            "Qty_Variance": "Qty Variance",
-            "Price_Variance": "Price Variance",
-            "Average_Delivery_Days": "Average Delivery Days"
+            "Ordered_Qty":
+                "Ordered Qty",
+
+            "Received_Qty":
+                "Received Qty",
+
+            "Qty_Variance":
+                "Qty Variance",
+
+            "Variance_Value":
+                "Variance Value",
+
+            "Average_Delivery_Days":
+                "Average Delivery Days"
         },
         inplace=True
     )
@@ -605,12 +651,16 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
             "Orders"
         ],
         ascending=[
-            False,  # highest fulfillment first
-            True,   # lowest delivery days first
-            False   # most orders first
+            False,  # Highest fulfillment first
+            True,   # Lowest delivery days first
+            False   # Most orders first
         ],
         inplace=True
     )
+
+    # -------------------------------------------------------------------------
+    # Reset Index
+    # -------------------------------------------------------------------------
 
     summary.reset_index(
         drop=True,
@@ -625,16 +675,38 @@ def create_master_summary(df: pd.DataFrame) -> pd.DataFrame:
 
 def create_executive_summary(df: pd.DataFrame) -> dict:
     """
-    Dashboard KPI cards.
+    Create executive dashboard KPI values.
+
+    Variance Value represents the monetary value of the
+    quantity variance and is calculated from the transaction-level
+    'Variance Value' column.
     """
 
+    # -------------------------------------------------------------------------
+    # Total Ordered Quantity
+    # -------------------------------------------------------------------------
+
     ordered = df["Ordered"].sum()
+
+    # -------------------------------------------------------------------------
+    # Total Received Quantity
+    # -------------------------------------------------------------------------
+
     received = df["Booked QTY"].sum()
 
+    # -------------------------------------------------------------------------
+    # Overall Order Fulfillment Rate
+    # -------------------------------------------------------------------------
+
     fill_rate = (
-        (received / ordered) 
-        if ordered else 0
+        received / ordered
+        if ordered
+        else 0
     )
+
+    # -------------------------------------------------------------------------
+    # Executive KPI Dictionary
+    # -------------------------------------------------------------------------
 
     return {
 
@@ -651,38 +723,53 @@ def create_executive_summary(df: pd.DataFrame) -> dict:
             received,
 
         "Overall Order Fulfillment Rate %":
-            round(fill_rate, 4),
+            round(
+                fill_rate,
+                4
+            ),
 
         "Average Delivery Days":
-            round(df["Delivery Days"].mean(), 1),
+            round(
+                df["Delivery Days"].mean(),
+                1
+            ),
 
-        "Total Price Variance":
+        # IMPORTANT:
+        # This is Variance Value, not Price Variance.
+        "Total Variance Value":
             df["Variance Value"].sum(),
 
         "Total Quantity Variance":
             df["Variance QTY"].sum()
 
     }
-
 # =============================================================================
 # MASTER SUMMARY SHEET
 # =============================================================================
 
-def write_master_summary(workbook, summary_df, supplier_sheet_map):
+def write_master_summary(
+    workbook,
+    summary_df,
+    supplier_sheet_map
+):
 
-    ws = workbook.create_sheet("Master Summary")
+    ws = workbook.create_sheet(
+        "Master Summary"
+    )
 
-    # -----------------------------------------------------
+    # -------------------------------------------------------------------------
     # Reserve rows 1-10 for Dashboard
-    # -----------------------------------------------------
+    # -------------------------------------------------------------------------
 
     START_ROW = 11
 
-    # -----------------------------------------------------
+    # -------------------------------------------------------------------------
     # Styles
-    # -----------------------------------------------------
+    # -------------------------------------------------------------------------
 
-    thin = Side(style="thin")
+    thin = Side(
+        style="thin"
+    )
 
     border = Border(
         left=thin,
@@ -701,9 +788,9 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         color="FFFFFF"
     )
 
-    # -----------------------------------------------------
+    # -------------------------------------------------------------------------
     # Write Header Row
-    # -----------------------------------------------------
+    # -------------------------------------------------------------------------
 
     for col, header in enumerate(
         summary_df.columns,
@@ -726,15 +813,17 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
             wrap_text=True
         )
 
-    # -----------------------------------------------------
-    # Give Header Row Enough Vertical Space
-    # -----------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Header Row Height
+    # -------------------------------------------------------------------------
 
-    ws.row_dimensions[START_ROW].height = 35
+    ws.row_dimensions[
+        START_ROW
+    ].height = 35
 
-    # -----------------------------------------------------
+    # -------------------------------------------------------------------------
     # Write Supplier Names / Base Rows
-    # -----------------------------------------------------
+    # -------------------------------------------------------------------------
 
     current_row = START_ROW + 1
 
@@ -742,12 +831,11 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         index=False
     ):
 
-        # -------------------------------------------------
-        # Write initial values
+        # ---------------------------------------------------------------------
+        # Write Initial Values
         #
-        # These values will be replaced with formulas
-        # for the KPI columns below.
-        # -------------------------------------------------
+        # These values will be replaced with live formulas for KPI columns.
+        # ---------------------------------------------------------------------
 
         for col, value in enumerate(
             record,
@@ -769,9 +857,9 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
                 cell.number_format = "#,##0.00"
 
-        # -----------------------------------------------------
+        # ---------------------------------------------------------------------
         # Supplier Hyperlink
-        # -----------------------------------------------------
+        # ---------------------------------------------------------------------
 
         supplier_cell = ws.cell(
             current_row,
@@ -787,19 +875,16 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
             supplier_name[:31]
         )
 
-        # -----------------------------------------------------
         # IMPORTANT:
-        # Keep the existing working hyperlink approach.
-        # Do NOT use insert_rows() anywhere here.
-        # -----------------------------------------------------
-
+        # Do not use insert_rows().
+        # This preserves the working hyperlinks.
         supplier_cell.hyperlink = (
             f"#'{sheet_name}'!A1"
         )
 
-        # -----------------------------------------------------
-        # Hyperlink appearance
-        # -----------------------------------------------------
+        # ---------------------------------------------------------------------
+        # Hyperlink Appearance
+        # ---------------------------------------------------------------------
 
         supplier_cell.font = Font(
             color="0563C1",
@@ -808,19 +893,15 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
 
         supplier_cell.border = border
 
-        # -----------------------------------------------------
-        # Move to next supplier
-        # -----------------------------------------------------
-
         current_row += 1
 
-    # =========================================================
+    # =========================================================================
     # LIVE FORMULAS
-    # =========================================================
+    # =========================================================================
 
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
     # Identify Master Summary Columns
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
 
     headers = {
         cell.value: cell.column
@@ -847,8 +928,10 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         "Qty Variance"
     )
 
-    price_variance_col = headers.get(
-        "Price Variance"
+    # IMPORTANT:
+    # Correct name is Variance Value.
+    variance_value_col = headers.get(
+        "Variance Value"
     )
 
     avg_days_col = headers.get(
@@ -859,9 +942,9 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         "Order Fulfillment Rate %"
     )
 
-    # ---------------------------------------------------------
-    # Loop through each supplier row
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Loop through Each Supplier
+    # -------------------------------------------------------------------------
 
     for row in range(
         START_ROW + 1,
@@ -882,11 +965,13 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         if not sheet_name:
             continue
 
-        supplier_sheet = workbook[sheet_name]
+        supplier_sheet = workbook[
+            sheet_name
+        ]
 
-        # -----------------------------------------------------
+        # ---------------------------------------------------------------------
         # Find Supplier KPI Panel
-        # -----------------------------------------------------
+        # ---------------------------------------------------------------------
 
         kpi_title_row = None
 
@@ -906,16 +991,16 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 kpi_title_row = search_row
                 break
 
-        # -----------------------------------------------------
+        # ---------------------------------------------------------------------
         # Safety Check
-        # -----------------------------------------------------
+        # ---------------------------------------------------------------------
 
         if kpi_title_row is None:
             continue
 
-        # -----------------------------------------------------
+        # ---------------------------------------------------------------------
         # Find KPI Rows by Label
-        # -----------------------------------------------------
+        # ---------------------------------------------------------------------
 
         kpi_rows = {}
 
@@ -933,24 +1018,30 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
             ).value
 
             if kpi_name:
-                kpi_rows[str(kpi_name)] = search_row
 
-        # =====================================================
+                kpi_rows[
+                    str(kpi_name)
+                ] = search_row
+
+        # =====================================================================
         # ORDERS
-        # =====================================================
+        # =====================================================================
 
         if (
             orders_col
             and "Orders" in kpi_rows
         ):
 
-            source_row = kpi_rows["Orders"]
+            source_row = kpi_rows[
+                "Orders"
+            ]
 
             ws.cell(
                 row,
                 orders_col
             ).value = (
-                f"='{sheet_name}'!B{source_row}"
+                f"='{sheet_name}'!"
+                f"B{source_row}"
             )
 
             ws.cell(
@@ -958,22 +1049,25 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 orders_col
             ).number_format = "0"
 
-        # =====================================================
+        # =====================================================================
         # ORDERED QTY
-        # =====================================================
+        # =====================================================================
 
         if (
             ordered_col
             and "Ordered Qty" in kpi_rows
         ):
 
-            source_row = kpi_rows["Ordered Qty"]
+            source_row = kpi_rows[
+                "Ordered Qty"
+            ]
 
             ws.cell(
                 row,
                 ordered_col
             ).value = (
-                f"='{sheet_name}'!B{source_row}"
+                f"='{sheet_name}'!"
+                f"B{source_row}"
             )
 
             ws.cell(
@@ -981,22 +1075,25 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 ordered_col
             ).number_format = "#,##0.00"
 
-        # =====================================================
+        # =====================================================================
         # RECEIVED QTY
-        # =====================================================
+        # =====================================================================
 
         if (
             received_col
             and "Received Qty" in kpi_rows
         ):
 
-            source_row = kpi_rows["Received Qty"]
+            source_row = kpi_rows[
+                "Received Qty"
+            ]
 
             ws.cell(
                 row,
                 received_col
             ).value = (
-                f"='{sheet_name}'!B{source_row}"
+                f"='{sheet_name}'!"
+                f"B{source_row}"
             )
 
             ws.cell(
@@ -1004,9 +1101,9 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 received_col
             ).number_format = "#,##0.00"
 
-        # =====================================================
+        # =====================================================================
         # QUANTITY VARIANCE
-        # =====================================================
+        # =====================================================================
 
         if (
             qty_variance_col
@@ -1021,7 +1118,8 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 row,
                 qty_variance_col
             ).value = (
-                f"='{sheet_name}'!B{source_row}"
+                f"='{sheet_name}'!"
+                f"B{source_row}"
             )
 
             ws.cell(
@@ -1029,34 +1127,36 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 qty_variance_col
             ).number_format = "#,##0.00"
 
-        # =====================================================
-        # PRICE VARIANCE
-        # =====================================================
+        # =====================================================================
+        # VARIANCE VALUE
+        # =====================================================================
 
         if (
-            price_variance_col
-            and "Price Variance" in kpi_rows
+            variance_value_col
+            and "Variance Value" in kpi_rows
         ):
 
             source_row = kpi_rows[
-                "Price Variance"
+                "Variance Value"
             ]
 
             ws.cell(
                 row,
-                price_variance_col
+                variance_value_col
             ).value = (
-                f"='{sheet_name}'!B{source_row}"
+                f"='{sheet_name}'!"
+                f"B{source_row}"
             )
 
+            # Monetary value
             ws.cell(
                 row,
-                price_variance_col
+                variance_value_col
             ).number_format = "#,##0.00"
 
-        # =====================================================
+        # =====================================================================
         # AVERAGE DELIVERY DAYS
-        # =====================================================
+        # =====================================================================
 
         if (
             avg_days_col
@@ -1071,7 +1171,8 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 row,
                 avg_days_col
             ).value = (
-                f"='{sheet_name}'!B{source_row}"
+                f"='{sheet_name}'!"
+                f"B{source_row}"
             )
 
             ws.cell(
@@ -1079,9 +1180,9 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 avg_days_col
             ).number_format = "0.0"
 
-        # =====================================================
+        # =====================================================================
         # ORDER FULFILLMENT RATE
-        # =====================================================
+        # =====================================================================
 
         if (
             fulfillment_col
@@ -1114,13 +1215,13 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 fulfillment_col
             ).number_format = "0.00%"
 
-    # =========================================================
+    # =========================================================================
     # GENERAL FORMATTING
-    # =========================================================
+    # =========================================================================
 
-    # ---------------------------------------------------------
-    # Make sure all data cells retain borders
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Ensure All Data Cells Have Borders
+    # -------------------------------------------------------------------------
 
     for row in range(
         START_ROW + 1,
@@ -1137,9 +1238,9 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 col
             ).border = border
 
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
     # Percentage Column
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
 
     if fulfillment_col:
 
@@ -1153,9 +1254,9 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 fulfillment_col
             ).number_format = "0.00%"
 
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
     # Delivery Days
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
 
     if avg_days_col:
 
@@ -1169,9 +1270,9 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
                 avg_days_col
             ).number_format = "0.0"
 
-    # =========================================================
+    # =========================================================================
     # AUTO FILTER
-    # =========================================================
+    # =========================================================================
 
     last_col = get_column_letter(
         ws.max_column
@@ -1182,19 +1283,21 @@ def write_master_summary(workbook, summary_df, supplier_sheet_map):
         f"{last_col}{ws.max_row}"
     )
 
-    # =========================================================
+    # =========================================================================
     # FREEZE PANES
-    # =========================================================
+    # =========================================================================
 
     ws.freeze_panes = (
         f"A{START_ROW + 1}"
     )
 
-    # =========================================================
+    # =========================================================================
     # MASTER SUMMARY COLUMN WIDTHS
-    # =========================================================
+    # =========================================================================
 
-    format_master_summary_columns(ws)
+    format_master_summary_columns(
+        ws
+    )
 
     return ws
 # =============================================================================
@@ -1213,63 +1316,153 @@ def format_master_summary_columns(ws):
     column_widths = {
 
         "A": 40,   # Supplier / Dashboard labels
+
         "B": 18,   # Orders / Dashboard values
+
         "C": 18,   # Ordered Qty
+
         "D": 18,   # Received Qty
+
         "E": 18,   # Qty Variance
-        "F": 20,   # Price Variance
+
+        "F": 20,   # Variance Value
+
         "G": 25,   # Average Delivery Days
+
         "H": 27    # Order Fulfillment Rate %
+
     }
 
-    # ---------------------------------------------------------
-    # Apply column widths
-    # ---------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # Apply Column Widths
+    # -------------------------------------------------------------------------
 
     for column, width in column_widths.items():
 
-        ws.column_dimensions[column].width = width
+        ws.column_dimensions[
+            column
+        ].width = width
 # =============================================================================
 # SUPPLIER KPI PANEL
 # =============================================================================
 
 def supplier_kpis(df: pd.DataFrame):
+    """
+    Calculate supplier-level KPI values.
+
+    KPI definitions:
+        Orders
+        Ordered Qty
+        Received Qty
+        Order Fulfillment Rate %
+        Quantity Variance
+        Variance Value
+        Average Delivery Days
+
+    IMPORTANT:
+    Variance Value is the monetary value associated with the
+    quantity variance. It should not be labelled Price Variance.
+    """
+
+    # -------------------------------------------------------------------------
+    # Ordered Quantity
+    # -------------------------------------------------------------------------
 
     ordered = df["Ordered"].sum()
 
+    # -------------------------------------------------------------------------
+    # Received Quantity
+    # -------------------------------------------------------------------------
+
     received = df["Booked QTY"].sum()
 
+    # -------------------------------------------------------------------------
+    # Order Fulfillment Rate
+    # -------------------------------------------------------------------------
+
     fill_rate = (
-        (received / ordered)
-        if ordered else 0
+        received / ordered
+        if ordered
+        else 0
     )
+
+    # -------------------------------------------------------------------------
+    # Average Delivery Days
+    #
+    # Calculate once per unique Purchase Order rather than
+    # once per article line.
+    # -------------------------------------------------------------------------
 
     delivery_days = (
         df[
-            ["Order No.", "Delivery Days"]
+            [
+                "Order No.",
+                "Delivery Days"
+            ]
         ]
-        .drop_duplicates(subset=["Order No."])
-        ["Delivery Days"]
+        .drop_duplicates(
+            subset=["Order No."]
+        )[
+            "Delivery Days"
+        ]
         .mean()
     )
 
+    # -------------------------------------------------------------------------
+    # Supplier KPI Results
+    # -------------------------------------------------------------------------
+
     return [
 
-        ("Orders", df["Order No."].nunique()),
+        # Number of unique Purchase Orders
+        (
+            "Orders",
+            df["Order No."].nunique()
+        ),
 
-        ("Ordered Qty", ordered),
+        # Total quantity ordered
+        (
+            "Ordered Qty",
+            ordered
+        ),
 
-        ("Received Qty", received),
+        # Total quantity received/booked
+        (
+            "Received Qty",
+            received
+        ),
 
-        ("Order Fulfillment Rate %", round(fill_rate, 4)),
+        # Received Qty / Ordered Qty
+        (
+            "Order Fulfillment Rate %",
+            round(
+                fill_rate,
+                4
+            )
+        ),
 
-        ("Quantity Variance", df["Variance QTY"].sum()),
+        # Quantity shortfall / excess
+        (
+            "Quantity Variance",
+            df["Variance QTY"].sum()
+        ),
 
-        ("Price Variance", df["Variance Value"].sum()),
+        # Monetary value of quantity variance
+        #
+        # IMPORTANT:
+        # This is NOT unit price variance.
+        (
+            "Variance Value",
+            df["Variance Value"].sum()
+        ),
 
+        # Average delivery time
         (
             "Average Delivery Days",
-            round(delivery_days, 1)
+            round(
+                delivery_days,
+                1
+            )
         )
 
     ]
