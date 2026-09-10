@@ -1468,14 +1468,48 @@ def supplier_kpis(df: pd.DataFrame):
     ]
 
 
+
 ###############################################################################
 # ARTICLE SUMMARY (PIVOT STYLE)
 ###############################################################################
 
 def create_article_summary(sheet, supplier_df, start_row):
     """
-    Creates a professional pivot-style Monthly Article Summary
-    with expandable Order Number details.
+    Creates a professional pivot-style Monthly Article Summary with
+    expandable Order Number details.
+
+    Structure:
+
+        Transaction Table
+              ↓
+        Hidden PO Detail Rows
+              ↓
+        Monthly Article Summary
+
+    The hidden PO detail rows use LIVE EXCEL FORMULAS referencing the
+    supplier transaction table.
+
+    The visible Article Summary rows then use LIVE EXCEL FORMULAS
+    referencing the hidden PO detail rows.
+
+    Monthly Article Summary columns:
+
+        A = Article / Order Number
+        B = Ordered Qty
+        C = Delivered Qty
+        D = Qty Variance
+        E = No. of Orders
+
+    Hidden PO detail rows:
+
+        A = Order Number
+        B = Ordered Qty
+        C = Delivered Qty
+        D = Qty Variance
+        E = Blank
+
+    No. of Orders counts UNIQUE Order Numbers from Column A of the
+    hidden PO detail rows.
 
     Returns
     -------
@@ -1552,6 +1586,110 @@ def create_article_summary(sheet, supplier_df, start_row):
     )
 
     # -------------------------------------------------------------------------
+    # FIND TRANSACTION TABLE
+    # -------------------------------------------------------------------------
+    #
+    # The hidden PO detail rows will reference the actual supplier transaction
+    # table instead of writing static pandas values.
+    #
+    # We identify the transaction table columns by their header names.
+    #
+    # -------------------------------------------------------------------------
+
+    transaction_header_row = None
+
+    required_headers = [
+        "Article",
+        "Order No.",
+        "Ordered",
+        "Booked QTY",
+        "Variance QTY"
+    ]
+
+    header_positions = {}
+
+    # Search the worksheet for the transaction table headers.
+    #
+    # We search the first 100 rows because the supplier transaction table
+    # normally appears near the top of the supplier sheet.
+
+    for row in range(1, min(sheet.max_row, 100) + 1):
+
+        row_values = {}
+
+        for col in range(1, sheet.max_column + 1):
+            value = sheet.cell(row, col).value
+
+            if value is not None:
+                row_values[str(value).strip()] = col
+
+        if all(header in row_values for header in required_headers):
+
+            transaction_header_row = row
+            header_positions = row_values
+            break
+
+    if transaction_header_row is None:
+        raise ValueError(
+            "Could not find the supplier transaction table headers "
+            "required for the Monthly Article Summary."
+        )
+
+    # -------------------------------------------------------------------------
+    # TRANSACTION TABLE COLUMN NUMBERS
+    # -------------------------------------------------------------------------
+
+    transaction_article_col = header_positions["Article"]
+    transaction_order_col = header_positions["Order No."]
+    transaction_ordered_col = header_positions["Ordered"]
+    transaction_booked_col = header_positions["Booked QTY"]
+    transaction_variance_col = header_positions["Variance QTY"]
+
+    # -------------------------------------------------------------------------
+    # FIND TRANSACTION TABLE LAST ROW
+    # -------------------------------------------------------------------------
+    #
+    # We use supplier_df length because it represents the transaction records
+    # that were written to the supplier sheet.
+    #
+    # -------------------------------------------------------------------------
+
+    transaction_first_data_row = transaction_header_row + 1
+
+    transaction_last_data_row = (
+        transaction_first_data_row + len(supplier_df) - 1
+    )
+
+    if transaction_last_data_row < transaction_first_data_row:
+        transaction_last_data_row = transaction_first_data_row
+
+    # -------------------------------------------------------------------------
+    # HELPER TO CREATE EXCEL COLUMN LETTER
+    # -------------------------------------------------------------------------
+
+    from openpyxl.utils import get_column_letter
+
+    transaction_article_letter = get_column_letter(
+        transaction_article_col
+    )
+
+    transaction_order_letter = get_column_letter(
+        transaction_order_col
+    )
+
+    transaction_ordered_letter = get_column_letter(
+        transaction_ordered_col
+    )
+
+    transaction_booked_letter = get_column_letter(
+        transaction_booked_col
+    )
+
+    transaction_variance_letter = get_column_letter(
+        transaction_variance_col
+    )
+
+    # -------------------------------------------------------------------------
     # TITLE
     # -------------------------------------------------------------------------
 
@@ -1566,10 +1704,13 @@ def create_article_summary(sheet, supplier_df, start_row):
     )
 
     title_cell = sheet.cell(title_row, 1)
+
     title_cell.value = "Monthly Article Summary"
 
     title_cell.fill = title_fill
+
     title_cell.font = white_font
+
     title_cell.alignment = Alignment(
         horizontal="left",
         vertical="center"
@@ -1583,6 +1724,7 @@ def create_article_summary(sheet, supplier_df, start_row):
         cell = sheet.cell(title_row, col)
 
         cell.fill = title_fill
+
         cell.border = table_border
 
     # -------------------------------------------------------------------------
@@ -1607,12 +1749,17 @@ def create_article_summary(sheet, supplier_df, start_row):
 
     for col, header in enumerate(headers, start=1):
 
-        cell = sheet.cell(header_row, col)
+        cell = sheet.cell(
+            header_row,
+            col
+        )
 
         cell.value = header
 
         cell.fill = header_fill
+
         cell.font = header_font
+
         cell.border = table_border
 
         cell.alignment = Alignment(
@@ -1637,6 +1784,19 @@ def create_article_summary(sheet, supplier_df, start_row):
     # -------------------------------------------------------------------------
     # MONTHLY ARTICLE TOTALS
     # -------------------------------------------------------------------------
+    #
+    # The DataFrame is used only to determine:
+    #
+    # - Which articles exist
+    # - Which transaction records belong to each article
+    #
+    # The visible Excel totals are NOT written from pandas.
+    #
+    # The hidden PO detail rows are Excel formulas.
+    #
+    # The visible Article Summary rows are also Excel formulas.
+    #
+    # -------------------------------------------------------------------------
 
     article_summary = (
         supplier_df
@@ -1660,24 +1820,38 @@ def create_article_summary(sheet, supplier_df, start_row):
 
         article_row = current_row
 
+        article_name = article["Article"]
+
         # ---------------------------------------------------------------------
         # ARTICLE SUMMARY ROW
         # ---------------------------------------------------------------------
 
-        article_cell = sheet.cell(current_row, 1)
-        article_cell.value = article["Article"]
+        article_cell = sheet.cell(
+            current_row,
+            1
+        )
 
-        ordered_cell = sheet.cell(current_row, 2)
-        ordered_cell.value = article["Ordered"]
+        article_cell.value = article_name
 
-        delivered_cell = sheet.cell(current_row, 3)
-        delivered_cell.value = article["Delivered"]
+        ordered_cell = sheet.cell(
+            current_row,
+            2
+        )
 
-        variance_cell = sheet.cell(current_row, 4)
-        variance_cell.value = article["Variance"]
+        delivered_cell = sheet.cell(
+            current_row,
+            3
+        )
 
-        frequency_cell = sheet.cell(current_row, 5)
-        frequency_cell.value = article["Order_Frequency"]
+        variance_cell = sheet.cell(
+            current_row,
+            4
+        )
+
+        frequency_cell = sheet.cell(
+            current_row,
+            5
+        )
 
         # ---------------------------------------------------------------------
         # ARTICLE ROW FORMATTING
@@ -1685,9 +1859,13 @@ def create_article_summary(sheet, supplier_df, start_row):
 
         for col in range(1, 6):
 
-            cell = sheet.cell(current_row, col)
+            cell = sheet.cell(
+                current_row,
+                col
+            )
 
             cell.border = table_border
+
             cell.font = article_font
 
             cell.alignment = Alignment(
@@ -1703,15 +1881,21 @@ def create_article_summary(sheet, supplier_df, start_row):
         # Numbers right aligned
         for col in range(2, 6):
 
-            sheet.cell(current_row, col).alignment = Alignment(
+            sheet.cell(
+                current_row,
+                col
+            ).alignment = Alignment(
                 horizontal="right",
                 vertical="center"
             )
 
-        # Number formatting
+        # Number formats
         ordered_cell.number_format = "#,##0.00"
+
         delivered_cell.number_format = "#,##0.00"
+
         variance_cell.number_format = "#,##0.00"
+
         frequency_cell.number_format = "0"
 
         sheet.row_dimensions[current_row].height = 20
@@ -1722,12 +1906,20 @@ def create_article_summary(sheet, supplier_df, start_row):
         current_row += 1
 
         # ---------------------------------------------------------------------
-        # ORDER DETAIL ROWS
+        # GET TRANSACTION ROWS FOR THIS ARTICLE
+        # ---------------------------------------------------------------------
+        #
+        # We use pandas only to determine WHICH transaction records belong
+        # to this article.
+        #
+        # The actual values in the hidden rows will come from Excel formulas
+        # referencing the transaction table.
+        #
         # ---------------------------------------------------------------------
 
         detail = (
             supplier_df[
-                supplier_df["Article"] == article["Article"]
+                supplier_df["Article"] == article_name
             ]
             .sort_values(
                 [
@@ -1737,44 +1929,180 @@ def create_article_summary(sheet, supplier_df, start_row):
             )
         )
 
+        # ---------------------------------------------------------------------
+        # HIDDEN PO DETAIL START ROW
+        # ---------------------------------------------------------------------
+
+        detail_start_row = current_row
+
+        # ---------------------------------------------------------------------
+        # WRITE HIDDEN PO DETAIL ROWS
+        # ---------------------------------------------------------------------
+
         for _, order in detail.iterrows():
 
             # -------------------------------------------------------------
-            # Order Number
+            # ORIGINAL TRANSACTION ROW
+            # -------------------------------------------------------------
+            #
+            # Because the supplier_df order matches the transaction table
+            # order, find the corresponding transaction row by locating the
+            # matching record.
+            #
+            # We use the Order No. and Article to identify the transaction
+            # record.
+            #
             # -------------------------------------------------------------
 
-            detail_article = sheet.cell(current_row, 1)
+            matching_rows = supplier_df[
+                (supplier_df["Article"] == order["Article"]) &
+                (supplier_df["Order No."] == order["Order No."])
+            ]
+
+            if matching_rows.empty:
+
+                raise ValueError(
+                    f"Could not find transaction row for "
+                    f"Article '{article_name}' and "
+                    f"Order No. '{order['Order No.']}'."
+                )
+
+            # -------------------------------------------------------------
+            # FIND EXACT TRANSACTION ROW
+            # -------------------------------------------------------------
+            #
+            # If the same Article + Order No. occurs more than once,
+            # use occurrence matching so that each hidden detail row
+            # points to the corresponding transaction record.
+            #
+            # -------------------------------------------------------------
+
+            occurrence_index = (
+                supplier_df[
+                    (supplier_df["Article"] == order["Article"]) &
+                    (supplier_df["Order No."] == order["Order No."])
+                ]
+                .index
+                .tolist()
+            )
+
+            original_index = order.name
+
+            if original_index not in occurrence_index:
+
+                raise ValueError(
+                    f"Could not match transaction record for "
+                    f"Article '{article_name}' and "
+                    f"Order No. '{order['Order No.']}'."
+                )
+
+            # Convert pandas index to worksheet row.
+            #
+            # supplier_df is assumed to have been written to the transaction
+            # table in its current row order.
+
+            try:
+
+                dataframe_position = (
+                    supplier_df.index.get_loc(original_index)
+                )
+
+                transaction_row = (
+                    transaction_first_data_row
+                    + dataframe_position
+                )
+
+            except Exception:
+
+                raise ValueError(
+                    f"Could not determine transaction worksheet row "
+                    f"for Article '{article_name}' and "
+                    f"Order No. '{order['Order No.']}'."
+                )
+
+            # -------------------------------------------------------------
+            # ORDER NUMBER
+            # -------------------------------------------------------------
+
+            detail_article = sheet.cell(
+                current_row,
+                1
+            )
 
             detail_article.value = (
-                "    " + str(order["Order No."])
+                "    "
+                + f"={transaction_order_letter}{transaction_row}"
             )
 
             # -------------------------------------------------------------
-            # Quantities
+            # ORDERED QTY
+            # -------------------------------------------------------------
+            #
+            # LIVE FORMULA REFERENCING TRANSACTION TABLE
             # -------------------------------------------------------------
 
-            detail_ordered = sheet.cell(current_row, 2)
-            detail_ordered.value = order["Ordered"]
+            detail_ordered = sheet.cell(
+                current_row,
+                2
+            )
 
-            detail_delivered = sheet.cell(current_row, 3)
-            detail_delivered.value = order["Booked QTY"]
+            detail_ordered.value = (
+                f"={transaction_ordered_letter}{transaction_row}"
+            )
 
-            detail_variance = sheet.cell(current_row, 4)
-            detail_variance.value = order["Variance QTY"]
+            # -------------------------------------------------------------
+            # DELIVERED QTY
+            # -------------------------------------------------------------
+            #
+            # LIVE FORMULA REFERENCING TRANSACTION TABLE
+            # -------------------------------------------------------------
+
+            detail_delivered = sheet.cell(
+                current_row,
+                3
+            )
+
+            detail_delivered.value = (
+                f"={transaction_booked_letter}{transaction_row}"
+            )
+
+            # -------------------------------------------------------------
+            # QTY VARIANCE
+            # -------------------------------------------------------------
+            #
+            # LIVE FORMULA REFERENCING TRANSACTION TABLE
+            # -------------------------------------------------------------
+
+            detail_variance = sheet.cell(
+                current_row,
+                4
+            )
+
+            detail_variance.value = (
+                f"={transaction_variance_letter}{transaction_row}"
+            )
 
             # No. of Orders column intentionally left blank
-            sheet.cell(current_row, 5).value = None
+            sheet.cell(
+                current_row,
+                5
+            ).value = None
 
             # -------------------------------------------------------------
-            # Detail Row Formatting
+            # DETAIL ROW FORMATTING
             # -------------------------------------------------------------
 
             for col in range(1, 6):
 
-                cell = sheet.cell(current_row, col)
+                cell = sheet.cell(
+                    current_row,
+                    col
+                )
 
                 cell.fill = detail_fill
+
                 cell.border = table_border
+
                 cell.font = detail_font
 
                 cell.alignment = Alignment(
@@ -1791,38 +2119,168 @@ def create_article_summary(sheet, supplier_df, start_row):
             # Numeric values right aligned
             for col in range(2, 5):
 
-                sheet.cell(current_row, col).alignment = Alignment(
+                sheet.cell(
+                    current_row,
+                    col
+                ).alignment = Alignment(
                     horizontal="right",
                     vertical="center"
                 )
 
             # Number formats
             detail_ordered.number_format = "#,##0.00"
+
             detail_delivered.number_format = "#,##0.00"
+
             detail_variance.number_format = "#,##0.00"
 
             # -------------------------------------------------------------
-            # Make Order Rows Collapsible
+            # MAKE ORDER ROWS COLLAPSIBLE
             # -------------------------------------------------------------
 
-            sheet.row_dimensions[current_row].outlineLevel = 1
-            sheet.row_dimensions[current_row].hidden = True
-            sheet.row_dimensions[current_row].height = 18
+            sheet.row_dimensions[
+                current_row
+            ].outlineLevel = 1
+
+            sheet.row_dimensions[
+                current_row
+            ].hidden = True
+
+            sheet.row_dimensions[
+                current_row
+            ].height = 18
 
             current_row += 1
+
+        # ---------------------------------------------------------------------
+        # REMEMBER FINAL HIDDEN PO DETAIL ROW
+        # ---------------------------------------------------------------------
+
+        detail_end_row = current_row - 1
+
+        # ---------------------------------------------------------------------
+        # LIVE FORMULAS FOR ARTICLE SUMMARY
+        # ---------------------------------------------------------------------
+        #
+        # Monthly Article Summary:
+        #
+        # A = Article / Order Number
+        # B = Ordered Qty
+        # C = Delivered Qty
+        # D = Qty Variance
+        # E = No. of Orders
+        #
+        # Hidden detail rows:
+        #
+        # A = Order Number
+        # B = Ordered Qty
+        # C = Delivered Qty
+        # D = Qty Variance
+        #
+        # ---------------------------------------------------------------------
+
+        if detail_end_row >= detail_start_row:
+
+            # -----------------------------------------------------------------
+            # ORDERED QUANTITY
+            # -----------------------------------------------------------------
+            #
+            # Sum Column B of hidden detail rows.
+            #
+            # -----------------------------------------------------------------
+
+            ordered_cell.value = (
+                f"=SUM("
+                f"B{detail_start_row}:B{detail_end_row}"
+                f")"
+            )
+
+            # -----------------------------------------------------------------
+            # DELIVERED QUANTITY
+            # -----------------------------------------------------------------
+            #
+            # Sum Column C of hidden detail rows.
+            #
+            # -----------------------------------------------------------------
+
+            delivered_cell.value = (
+                f"=SUM("
+                f"C{detail_start_row}:C{detail_end_row}"
+                f")"
+            )
+
+            # -----------------------------------------------------------------
+            # QUANTITY VARIANCE
+            # -----------------------------------------------------------------
+            #
+            # Ordered - Delivered
+            #
+            # Short delivery → Positive
+            # Full delivery  → Zero
+            # Over-delivery  → Negative
+            #
+            # -----------------------------------------------------------------
+
+            variance_cell.value = (
+                f"=B{article_row}-C{article_row}"
+            )
+
+            # -----------------------------------------------------------------
+            # NO. OF ORDERS
+            # -----------------------------------------------------------------
+            #
+            # Count UNIQUE Order Numbers from Column A of the hidden
+            # PO detail rows.
+            #
+            # Same PO appearing multiple times for the same article
+            # is counted only once.
+            #
+            # Example:
+            #
+            # TML202607-07092
+            # TML202607-07491
+            # TML202607-07491
+            #
+            # Result = 2
+            #
+            # -----------------------------------------------------------------
+
+            frequency_cell.value = (
+                f'=SUMPRODUCT(('
+                f'A{detail_start_row}:A{detail_end_row}<>""'
+                f')/COUNTIF('
+                f'A{detail_start_row}:A{detail_end_row},'
+                f'A{detail_start_row}:A{detail_end_row}'
+                f'))'
+            )
+
+        else:
+
+            # -----------------------------------------------------------------
+            # SAFETY FALLBACK
+            # -----------------------------------------------------------------
+
+            ordered_cell.value = "=0"
+
+            delivered_cell.value = "=0"
+
+            variance_cell.value = (
+                f"=B{article_row}-C{article_row}"
+            )
+
+            frequency_cell.value = "=0"
 
         # ---------------------------------------------------------------------
         # COLLAPSE DETAILS UNDER ARTICLE
         # ---------------------------------------------------------------------
 
-        sheet.row_dimensions[article_row].collapsed = True
+        sheet.row_dimensions[
+            article_row
+        ].collapsed = True
 
     # -------------------------------------------------------------------------
     # COLUMN WIDTHS
     # -------------------------------------------------------------------------
-
-    # Set minimum professional widths.
-    # format_worksheet() may later auto-fit them if your existing code does so.
 
     sheet.column_dimensions["A"].width = max(
         sheet.column_dimensions["A"].width or 0,
@@ -1858,6 +2316,8 @@ def create_article_summary(sheet, supplier_df, start_row):
         summary_rows,
         article_summary
     )
+
+
 ###############################################################################
 # HELPER TABLE
 ###############################################################################
