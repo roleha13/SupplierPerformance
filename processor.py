@@ -3675,37 +3675,40 @@ def add_supplier_chart(
         f"A{chart_row}"
     )
 
-###############################################################################
+# =============================================================================
 # MASTER DASHBOARD
-###############################################################################
+# =============================================================================
 
 def add_dashboard(master_ws, report_df):
     """
     Creates a live Executive Dashboard using Excel formulas
     linked to the Master Summary table.
+
+    IMPORTANT:
+    The Master Summary contains "Variance Value", not "Price Variance".
+
+    "Variance Value" represents the monetary value of the
+    quantity variance.
+
+    "Variance Price" is a separate transaction-level unit
+    price variance and is not part of the Master Summary KPI.
     """
 
     # ---------------------------------------------------------
     # Dashboard Title
     # ---------------------------------------------------------
 
-    
     master_ws["A1"] = REPORT_TITLE
-
-    master_ws["A1"].font = Font(
-        bold=True,
-        size=16
-    )
-
-    master_ws["A1"].fill = PatternFill(
-        fill_type="solid",
-        fgColor=HEADER_FILL
-    )
 
     master_ws["A1"].font = Font(
         bold=True,
         size=16,
         color=HEADER_FONT
+    )
+
+    master_ws["A1"].fill = PatternFill(
+        fill_type="solid",
+        fgColor=HEADER_FILL
     )
 
     master_ws.merge_cells("A1:B1")
@@ -3719,7 +3722,9 @@ def add_dashboard(master_ws, report_df):
     # Dashboard Styles
     # ---------------------------------------------------------
 
-    thin = Side(style="thin")
+    thin = Side(
+        style="thin"
+    )
 
     border = Border(
         left=thin,
@@ -3736,21 +3741,96 @@ def add_dashboard(master_ws, report_df):
     # ---------------------------------------------------------
     # Locate Master Summary columns
     # ---------------------------------------------------------
+    #
+    # Master Summary header is on row 11.
+    #
+    # IMPORTANT:
+    # The correct monetary variance column is
+    # "Variance Value".
+    #
+    # There is NO "Price Variance" column in the
+    # Master Summary.
+    # ---------------------------------------------------------
 
     headers = {
-        cell.value: cell.column
+        str(cell.value).strip(): cell.column
         for cell in master_ws[11]
+        if cell.value is not None
     }
+
+    # ---------------------------------------------------------
+    # Validate Required Columns
+    # ---------------------------------------------------------
+
+    required_headers = [
+        "Supplier",
+        "Orders",
+        "Ordered Qty",
+        "Received Qty",
+        "Qty Variance",
+        "Variance Value",
+        "Average Delivery Days"
+    ]
+
+    missing_headers = [
+        header
+        for header in required_headers
+        if header not in headers
+    ]
+
+    if missing_headers:
+
+        raise ValueError(
+            "Master Summary is missing the following required "
+            "dashboard columns:\n\n"
+            + "\n".join(
+                f"- {header}"
+                for header in missing_headers
+            )
+        )
+
+    # ---------------------------------------------------------
+    # Convert Column Numbers to Excel Letters
+    # ---------------------------------------------------------
 
     summary_last_row = master_ws.max_row
 
-    supplier_col = get_column_letter(headers["Supplier"])
-    orders_col = get_column_letter(headers["Orders"])
-    ordered_col = get_column_letter(headers["Ordered Qty"])
-    received_col = get_column_letter(headers["Received Qty"])
-    qty_var_col = get_column_letter(headers["Qty Variance"])
-    price_var_col = get_column_letter(headers["Price Variance"])
-    avg_days_col = get_column_letter(headers["Average Delivery Days"])
+    supplier_col = get_column_letter(
+        headers["Supplier"]
+    )
+
+    orders_col = get_column_letter(
+        headers["Orders"]
+    )
+
+    ordered_col = get_column_letter(
+        headers["Ordered Qty"]
+    )
+
+    received_col = get_column_letter(
+        headers["Received Qty"]
+    )
+
+    qty_var_col = get_column_letter(
+        headers["Qty Variance"]
+    )
+
+    # ---------------------------------------------------------
+    # IMPORTANT FIX
+    #
+    # Use "Variance Value" instead of "Price Variance".
+    #
+    # This matches create_master_summary() and the
+    # Supplier KPI Summary.
+    # ---------------------------------------------------------
+
+    variance_value_col = get_column_letter(
+        headers["Variance Value"]
+    )
+
+    avg_days_col = get_column_letter(
+        headers["Average Delivery Days"]
+    )
 
     # ---------------------------------------------------------
     # Dashboard Labels & Formulas
@@ -3758,47 +3838,128 @@ def add_dashboard(master_ws, report_df):
 
     dashboard = [
 
+        # =====================================================
+        # TOTAL SUPPLIERS
+        # =====================================================
+
         (
             "Total Suppliers",
-            f"=COUNTA({supplier_col}12:{supplier_col}{summary_last_row})"
+
+            f"=COUNTA("
+            f"{supplier_col}12:"
+            f"{supplier_col}{summary_last_row}"
+            f")"
         ),
+
+        # =====================================================
+        # TOTAL ORDERS
+        # =====================================================
 
         (
             "Total Orders",
-            f"=SUM({orders_col}12:{orders_col}{summary_last_row})"
+
+            f"=SUM("
+            f"{orders_col}12:"
+            f"{orders_col}{summary_last_row}"
+            f")"
         ),
+
+        # =====================================================
+        # TOTAL ORDERED QUANTITY
+        # =====================================================
 
         (
             "Total Ordered Qty",
-            f"=SUM({ordered_col}12:{ordered_col}{summary_last_row})"
+
+            f"=SUM("
+            f"{ordered_col}12:"
+            f"{ordered_col}{summary_last_row}"
+            f")"
         ),
+
+        # =====================================================
+        # TOTAL RECEIVED QUANTITY
+        # =====================================================
 
         (
             "Total Received Qty",
-            f"=SUM({received_col}12:{received_col}{summary_last_row})"
+
+            f"=SUM("
+            f"{received_col}12:"
+            f"{received_col}{summary_last_row}"
+            f")"
         ),
+
+        # =====================================================
+        # OVERALL ORDER FULFILLMENT RATE
+        # =====================================================
 
         (
             "Overall Order Fulfillment Rate",
-            f"=IF(SUM({ordered_col}12:{ordered_col}{summary_last_row})=0,"
+
+            f"=IF("
+            f"SUM("
+            f"{ordered_col}12:"
+            f"{ordered_col}{summary_last_row}"
+            f")=0,"
             f"0,"
-            f"SUM({received_col}12:{received_col}{summary_last_row})/"
-            f"SUM({ordered_col}12:{ordered_col}{summary_last_row}))"
+            f"SUM("
+            f"{received_col}12:"
+            f"{received_col}{summary_last_row}"
+            f")/"
+            f"SUM("
+            f"{ordered_col}12:"
+            f"{ordered_col}{summary_last_row}"
+            f")"
+            f")"
         ),
+
+        # =====================================================
+        # AVERAGE DELIVERY DAYS
+        # =====================================================
 
         (
             "Average Delivery Days",
-            f"=AVERAGE({avg_days_col}12:{avg_days_col}{summary_last_row})"
+
+            f"=IFERROR("
+            f"AVERAGE("
+            f"{avg_days_col}12:"
+            f"{avg_days_col}{summary_last_row}"
+            f"),"
+            f"0"
+            f")"
         ),
 
+        # =====================================================
+        # TOTAL VARIANCE VALUE
+        #
+        # IMPORTANT:
+        # This replaces the incorrect "Total Price Variance".
+        #
+        # Variance Value = Quantity Variance × PO Price
+        # at transaction level.
+        # =====================================================
+
         (
-            "Total Price Variance",
-            f"=SUM({price_var_col}12:{price_var_col}{summary_last_row})"
+            "Total Variance Value",
+
+            f"=SUM("
+            f"{variance_value_col}12:"
+            f"{variance_value_col}{summary_last_row}"
+            f")"
         ),
+
+        # =====================================================
+        # TOTAL QUANTITY VARIANCE
+        # =====================================================
 
         (
             "Total Quantity Variance",
-            f"=SUM({qty_var_col}12:{qty_var_col}{summary_last_row})"
+
+            f"=SUM("
+            f"{qty_var_col}12:"
+            f"{qty_var_col}{summary_last_row}"
+            f")"
         )
 
     ]
@@ -3811,19 +3972,52 @@ def add_dashboard(master_ws, report_df):
 
     for label, formula in dashboard:
 
+        # -----------------------------------------------------
         # Label Cell
-        label_cell = master_ws.cell(start_row, 1)
+        # -----------------------------------------------------
+
+        label_cell = master_ws.cell(
+            start_row,
+            1
+        )
+
         label_cell.value = label
-        label_cell.font = Font(bold=True)
+
+        label_cell.font = Font(
+            bold=True
+        )
+
         label_cell.fill = label_fill
+
         label_cell.border = border
 
+        label_cell.alignment = Alignment(
+            horizontal="left",
+            vertical="center"
+        )
+
+        # -----------------------------------------------------
         # Value Cell
-        value_cell = master_ws.cell(start_row, 2)
+        # -----------------------------------------------------
+
+        value_cell = master_ws.cell(
+            start_row,
+            2
+        )
+
         value_cell.value = formula
+
         value_cell.border = border
 
+        value_cell.alignment = Alignment(
+            horizontal="right",
+            vertical="center"
+        )
+
+        # -----------------------------------------------------
         # Number Formatting
+        # -----------------------------------------------------
+
         if "Fulfillment Rate" in label:
 
             value_cell.number_format = "0.00%"
@@ -3836,8 +4030,15 @@ def add_dashboard(master_ws, report_df):
 
             value_cell.number_format = "#,##0.00"
 
-        start_row += 1
+        # -----------------------------------------------------
+        # Row Height
+        # -----------------------------------------------------
 
+        master_ws.row_dimensions[
+            start_row
+        ].height = 22
+
+        start_row += 1
 ###############################################################################
 # SAVE REPORT
 ###############################################################################
