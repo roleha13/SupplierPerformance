@@ -2246,10 +2246,10 @@ def create_article_summary(sheet, supplier_df, start_row):
 
             frequency_cell.value = (
                 f'=SUMPRODUCT(('
-                f'A{detail_start_row}:A{detail_end_row}<>""'
-                f')/COUNTIF('
+                f'A{detail_start_row}:A{detail_end_row}<>"")/'
+                f'COUNTIF('
                 f'A{detail_start_row}:A{detail_end_row},'
-                f'A{detail_start_row}:A{detail_end_row}'
+                f'A{detail_start_row}:A{detail_end_row}&""'
                 f'))'
             )
 
