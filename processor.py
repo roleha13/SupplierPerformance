@@ -1283,6 +1283,7 @@ def write_master_summary(
         f"{last_col}{ws.max_row}"
     )
 
+
     # =========================================================================
     # FREEZE PANES
     # =========================================================================
@@ -1668,7 +1669,11 @@ def create_article_summary(sheet, supplier_df, start_row):
         size=12
     )
 
-    title_cell.fill = HEADER_FILL
+    title_cell.fill = PatternFill(
+        fill_type="solid",
+        fgColor=HEADER_FILL
+    )
+        
 
     title_cell.alignment = Alignment(
         horizontal="left",
@@ -1734,6 +1739,12 @@ def create_article_summary(sheet, supplier_df, start_row):
         fill_type="solid",
         fgColor="F7F7F7"
     )
+
+    header_fill = PatternFill(
+        fill_type="solid",
+        fgColor=HEADER_FILL
+    )
+        
 
     # =========================================================================
     # 8. MAP DATAFRAME INDEX TO TRANSACTION SHEET ROW
