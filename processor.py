@@ -2030,8 +2030,7 @@ def create_article_summary(sheet, supplier_df, start_row):
             )
 
             detail_article.value = (
-                "    "
-                + f"={transaction_order_letter}{transaction_row}"
+                f"={transaction_order_letter}{transaction_row}"
             )
 
             # -------------------------------------------------------------
