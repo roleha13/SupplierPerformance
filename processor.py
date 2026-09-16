@@ -4092,15 +4092,31 @@ def build_workbook(report_df):
 
 def format_worksheet(ws, last_data_row):
     """
-    Apply professional worksheet formatting.
+    Apply professional formatting to the supplier worksheet.
 
-    Only the transaction table (rows 1 to last_data_row)
-    receives column-specific formatting.
+    IMPORTANT
+    ---------
+    Only the transaction table is treated as the transaction table.
+
+    Transaction table:
+        Row 1                  = headers
+        Rows 2:last_data_row   = transaction data
+        Columns A:O            = transaction columns
+
+    The following sections are NOT included in transaction formatting:
+        - TOTAL row
+        - Supplier KPI Summary
+        - Order No. Summary
+        - Monthly Article Summary
+        - Charts
+
+    This prevents the lower report sections from being affected by
+    transaction-table filters, number formatting, or row formatting.
     """
 
-    # -------------------------------------------------------------------------
-    # Styles
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    # STYLES
+    # =========================================================================
 
     header_fill = PatternFill(
         fill_type="solid",
@@ -4112,7 +4128,9 @@ def format_worksheet(ws, last_data_row):
         color=HEADER_FONT
     )
 
-    thin = Side(style="thin")
+    thin = Side(
+        style="thin"
+    )
 
     border = Border(
         left=thin,
@@ -4121,20 +4139,35 @@ def format_worksheet(ws, last_data_row):
         bottom=thin
     )
 
-    # -------------------------------------------------------------------------
-    # Worksheet settings
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    # TRANSACTION TABLE SETTINGS
+    # =========================================================================
 
+    # Keep the existing configured freeze pane.
+    # This freezes the transaction header row.
     ws.freeze_panes = FREEZE_PANES
-    ws.auto_filter.ref = f"A1:{get_column_letter(ws.max_column)}{last_data_row}"
 
-    # -------------------------------------------------------------------------
-    # Transaction Table Header
-    # -------------------------------------------------------------------------
+    # IMPORTANT:
+    # The transaction table is A:O.
+    #
+    # Do NOT use ws.max_column here because the worksheet now contains
+    # additional report sections below the transaction table.
+    ws.auto_filter.ref = (
+        f"A1:O{last_data_row}"
+    )
+
+    # =========================================================================
+    # TRANSACTION TABLE HEADER
+    # =========================================================================
 
     ws.row_dimensions[1].height = HEADER_ROW_HEIGHT
 
-    for cell in ws[1]:
+    for col in range(1, 16):
+
+        cell = ws.cell(
+            1,
+            col
+        )
 
         cell.fill = header_fill
         cell.font = header_font
@@ -4146,122 +4179,208 @@ def format_worksheet(ws, last_data_row):
 
         cell.border = border
 
-    # -------------------------------------------------------------------------
-    # Store transaction headers
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    # STORE TRANSACTION HEADERS
+    # =========================================================================
 
     headers = {
         cell.column: str(cell.value)
         for cell in ws[1]
+        if cell.column <= 15
     }
 
-    # -------------------------------------------------------------------------
-    # Format ONLY the transaction table
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    # FORMAT ONLY TRANSACTION DATA
+    # =========================================================================
 
     for row in ws.iter_rows(
         min_row=2,
-        max_row=last_data_row
+        max_row=last_data_row,
+        min_col=1,
+        max_col=15
     ):
 
-        ws.row_dimensions[row[0].row].height = DEFAULT_ROW_HEIGHT
+        ws.row_dimensions[
+            row[0].row
+        ].height = DEFAULT_ROW_HEIGHT
 
         for cell in row:
 
             cell.border = border
 
-            header = headers.get(cell.column, "")
+            header = headers.get(
+                cell.column,
+                ""
+            )
 
-            # Dates
+            # -----------------------------------------------------------------
+            # DATES
+            # -----------------------------------------------------------------
+
             if "Date" in header:
 
                 cell.number_format = "dd-mmm-yyyy"
 
-            # Percentages
+            # -----------------------------------------------------------------
+            # PERCENTAGES
+            # -----------------------------------------------------------------
+
             elif "%" in header:
 
                 cell.number_format = "0.00%"
 
-            # Numbers
-            elif isinstance(cell.value, (int, float)):
+            # -----------------------------------------------------------------
+            # NUMBERS
+            # -----------------------------------------------------------------
+
+            elif isinstance(
+                cell.value,
+                (int, float)
+            ):
 
                 cell.number_format = "#,##0.00"
 
-    # -------------------------------------------------------------------------
-    # Auto-fit all columns
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    # AUTO-FIT TRANSACTION COLUMNS ONLY
+    # =========================================================================
+    #
+    # IMPORTANT:
+    # Do NOT use:
+    #
+    #     for column in ws.columns:
+    #
+    # because ws.columns now includes the Order No. Summary and other
+    # sections.
+    #
+    # We only auto-fit A:O using the transaction table.
+    #
+    # Existing widths created by the summary functions are preserved if
+    # they are already wider.
+    # =========================================================================
 
-    for column in ws.columns:
+    for col_num in range(1, 16):
+
+        column_letter = get_column_letter(
+            col_num
+        )
 
         max_length = 0
 
-        column_letter = get_column_letter(column[0].column)
+        # Header length
+        header_value = ws.cell(
+            1,
+            col_num
+        ).value
 
-        for cell in column:
+        if header_value is not None:
 
-            try:
+            max_length = len(
+                str(header_value)
+            )
 
-                if cell.value is not None:
+        # Transaction data only
+        for row_num in range(
+            2,
+            last_data_row + 1
+        ):
 
-                    max_length = max(
-                        max_length,
-                        len(str(cell.value))
-                    )
+            value = ws.cell(
+                row_num,
+                col_num
+            ).value
 
-            except Exception:
+            if value is not None:
 
-                pass
+                max_length = max(
+                    max_length,
+                    len(str(value))
+                )
 
-        ws.column_dimensions[column_letter].width = min(
+        calculated_width = min(
             max_length + 3,
             40
         )
+
+        # Never reduce a width already established by
+        # create_order_summary() or create_article_summary().
+        existing_width = (
+            ws.column_dimensions[
+                column_letter
+            ].width
+            or 0
+        )
+
+        ws.column_dimensions[
+            column_letter
+        ].width = max(
+            existing_width,
+            calculated_width
+        )
+
 
 ###############################################################################
 # CONDITIONAL FORMATTING
 ###############################################################################
 
-def apply_conditional_formatting(ws):
+def apply_conditional_formatting(ws, last_data_row):
+    """
+    Apply conditional formatting ONLY to the transaction table.
+
+    Delivery Days colour scale is restricted to:
+        Row 2:last_data_row
+
+    This prevents the conditional formatting from affecting:
+        - TOTAL row
+        - Supplier KPI Summary
+        - Order No. Summary
+        - Monthly Article Summary
+        - Chart Summary
+    """
+
+    # =========================================================================
+    # FIND TRANSACTION HEADERS
+    # =========================================================================
 
     headers = {
-
         cell.value: cell.column
-
         for cell in ws[1]
-
+        if cell.column <= 15
     }
+
+    # =========================================================================
+    # DELIVERY DAYS
+    # =========================================================================
 
     if "Delivery Days" in headers:
 
         col = get_column_letter(
-
             headers["Delivery Days"]
-
         )
 
-        ws.conditional_formatting.add(
+        # ---------------------------------------------------------------------
+        # Apply colour scale ONLY to transaction data.
+        # ---------------------------------------------------------------------
 
-            f"{col}2:{col}{ws.max_row}",
+        if last_data_row >= 2:
 
-            ColorScaleRule(
+            ws.conditional_formatting.add(
 
-                start_type="min",
+                f"{col}2:{col}{last_data_row}",
 
-                start_color="63BE7B",
+                ColorScaleRule(
 
-                mid_type="percentile",
+                    start_type="min",
+                    start_color="63BE7B",
 
-                mid_value=50,
+                    mid_type="percentile",
+                    mid_value=50,
+                    mid_color="FFEB84",
 
-                mid_color="FFEB84",
-
-                end_type="max",
-
-                end_color="F8696B"
-
+                    end_type="max",
+                    end_color="F8696A"
+                )
             )
 
-        )
 
 
 ###############################################################################
@@ -4877,15 +4996,16 @@ def process_files(
 
         if sheet.title in worksheet_last_rows:
 
-            format_worksheet(
-
-                sheet,
-
+            last_data_row = (
                 worksheet_last_rows[sheet.title]
-
+            )
+                
+            format_worksheet(
+                sheet,
+                worksheet_last_rows[sheet.title]
             )
 
-        apply_conditional_formatting(sheet)
+            apply_conditional_formatting(sheet,last_data_row)
     # ---------------------------------------------------------
     # Return workbook and report period
     # ---------------------------------------------------------
