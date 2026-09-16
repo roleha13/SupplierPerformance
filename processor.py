@@ -2341,7 +2341,7 @@ def create_order_summary(
             Article detail
             Article detail
 
-    The main Order No. rows use LIVE EXCEL FORMULAS referencing
+    Main Order No. rows use LIVE EXCEL FORMULAS referencing
     the supplier transaction table.
 
     Article detail rows also use LIVE EXCEL FORMULAS referencing
@@ -2349,17 +2349,17 @@ def create_order_summary(
 
     Returns
     -------
-    order_summary_start : int
-        First row containing the Order No. Summary title.
+    title_row : int
+        Row containing the Order No. Summary title.
 
-    order_summary_header_row : int
+    header_row : int
         Row containing the Order No. Summary headers.
 
     order_summary_first_data_row : int
-        First Order No. data row.
+        First main Order No. data row.
 
     order_summary_last_data_row : int
-        Last Order No. summary row.
+        Last main Order No. data row.
     """
 
     from openpyxl.styles import (
@@ -2369,11 +2369,12 @@ def create_order_summary(
         Side,
         Alignment
     )
+
     from openpyxl.utils import get_column_letter
 
-    # -------------------------------------------------------------------------
+    # =========================================================================
     # STYLES
-    # -------------------------------------------------------------------------
+    # =========================================================================
 
     title_fill = PatternFill(
         fill_type="solid",
@@ -2423,15 +2424,15 @@ def create_order_summary(
         bottom=thin_side
     )
 
-    # -------------------------------------------------------------------------
+    # =========================================================================
     # FIND TRANSACTION COLUMNS
-    # -------------------------------------------------------------------------
+    # =========================================================================
 
     transaction_headers = {
         str(sheet.cell(1, col).value).strip(): col
         for col in range(
             1,
-            sheet.max_column + 1
+            transaction_last_data_row * 0 + sheet.max_column + 1
         )
     }
 
@@ -2482,9 +2483,9 @@ def create_order_summary(
             "for the Order No. Summary."
         )
 
-    # -------------------------------------------------------------------------
+    # =========================================================================
     # TRANSACTION COLUMN LETTERS
-    # -------------------------------------------------------------------------
+    # =========================================================================
 
     transaction_order_letter = get_column_letter(
         transaction_order_col
@@ -2514,11 +2515,19 @@ def create_order_summary(
         transaction_delivery_date_col
     )
 
-    # -------------------------------------------------------------------------
+    # =========================================================================
     # VALID PURCHASE ORDERS
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    #
+    # IMPORTANT:
+    # Convert the GroupBy object to an explicit list.
+    #
+    # This makes the number of unique order groups predictable and allows
+    # len(valid_orders) to be used safely later.
+    #
+    # =========================================================================
 
-    valid_orders = (
+    valid_order_df = (
         supplier_df[
             supplier_df["Order No."].notna()
             & ~supplier_df["Order No."].astype(str).str.strip().isin(
@@ -2530,15 +2539,18 @@ def create_order_summary(
                 ]
             )
         ]
-        .groupby(
+    )
+
+    valid_orders = list(
+        valid_order_df.groupby(
             "Order No.",
             sort=True
         )
     )
 
-    # -------------------------------------------------------------------------
+    # =========================================================================
     # TITLE
-    # -------------------------------------------------------------------------
+    # =========================================================================
 
     title_row = start_row
 
@@ -2579,15 +2591,15 @@ def create_order_summary(
         title_row
     ].height = 24
 
-    # -------------------------------------------------------------------------
+    # =========================================================================
     # SPACE BETWEEN TITLE AND HEADER
-    # -------------------------------------------------------------------------
+    # =========================================================================
 
     header_row = title_row + 2
 
-    # -------------------------------------------------------------------------
+    # =========================================================================
     # HEADERS
-    # -------------------------------------------------------------------------
+    # =========================================================================
 
     headers = [
         "Order No.",
@@ -2621,25 +2633,29 @@ def create_order_summary(
         header_row
     ].height = 21
 
-    # -------------------------------------------------------------------------
-    # FIRST ORDER SUMMARY ROW
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    # FIRST MAIN ORDER SUMMARY ROW
+    # =========================================================================
 
     current_row = header_row + 1
 
     order_summary_first_data_row = current_row
 
-    # -------------------------------------------------------------------------
-    # WRITE ONE ROW PER UNIQUE ORDER
-    # -------------------------------------------------------------------------
+    # =========================================================================
+    # WRITE ONE MAIN ROW PER UNIQUE ORDER
+    # =========================================================================
 
     for order_no, order_group in valid_orders:
 
+        # ---------------------------------------------------------------------
+        # MAIN ORDER ROW
+        # ---------------------------------------------------------------------
+
         order_row = current_row
 
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # ORDER NUMBER
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
 
         order_cell = sheet.cell(
             order_row,
@@ -2655,9 +2671,12 @@ def create_order_summary(
             vertical="center"
         )
 
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # ORDERED QTY
-        # -------------------------------------------------------------
+        #
+        # LIVE FORMULA:
+        # Sum all Ordered quantities for this Purchase Order.
+        # ---------------------------------------------------------------------
 
         ordered_cell = sheet.cell(
             order_row,
@@ -2683,9 +2702,12 @@ def create_order_summary(
             vertical="center"
         )
 
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # DELIVERED QTY
-        # -------------------------------------------------------------
+        #
+        # LIVE FORMULA:
+        # Sum all Booked QTY values for this Purchase Order.
+        # ---------------------------------------------------------------------
 
         delivered_cell = sheet.cell(
             order_row,
@@ -2711,9 +2733,15 @@ def create_order_summary(
             vertical="center"
         )
 
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # QTY VARIANCE
-        # -------------------------------------------------------------
+        #
+        # Ordered - Delivered
+        #
+        # Positive = short delivery
+        # Zero     = full delivery
+        # Negative = over-delivery
+        # ---------------------------------------------------------------------
 
         variance_cell = sheet.cell(
             order_row,
@@ -2733,12 +2761,17 @@ def create_order_summary(
             vertical="center"
         )
 
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # DELIVERY DAYS
         #
-        # Latest Delivery Date - Earliest Order Date
-        # for the Purchase Order.
-        # -------------------------------------------------------------
+        # LIVE FORMULA:
+        #
+        # Latest Delivery Date
+        # minus
+        # Earliest Order Date
+        #
+        # for this Purchase Order.
+        # ---------------------------------------------------------------------
 
         delivery_days_cell = sheet.cell(
             order_row,
@@ -2747,6 +2780,7 @@ def create_order_summary(
 
         delivery_days_cell.value = (
             f'=IFERROR('
+
             f'MAXIFS('
             f'${transaction_delivery_date_letter}${transaction_first_data_row}:'
             f'${transaction_delivery_date_letter}${transaction_last_data_row},'
@@ -2754,7 +2788,9 @@ def create_order_summary(
             f'${transaction_order_letter}${transaction_last_data_row},'
             f'A{order_row}'
             f')'
+
             f'-'
+
             f'MINIFS('
             f'${transaction_order_date_letter}${transaction_first_data_row}:'
             f'${transaction_order_date_letter}${transaction_last_data_row},'
@@ -2762,6 +2798,7 @@ def create_order_summary(
             f'${transaction_order_letter}${transaction_last_data_row},'
             f'A{order_row}'
             f'),'
+
             f'0'
             f')'
         )
@@ -2775,56 +2812,65 @@ def create_order_summary(
             vertical="center"
         )
 
-        # -------------------------------------------------------------
-        # ROW HEIGHT
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
+        # MAIN ORDER ROW HEIGHT
+        # ---------------------------------------------------------------------
 
         sheet.row_dimensions[
             order_row
         ].height = 20
 
-        # -------------------------------------------------------------
-        # FIND TRANSACTIONS FOR THIS ORDER
-        # -------------------------------------------------------------
-
-        detail = order_group[
-            [
-                "Article",
-                "Order No."
-            ]
-        ]
-
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
         # ARTICLE DETAIL ROWS
-        # -------------------------------------------------------------
-
-        detail_start_row = current_row + 1
+        # ---------------------------------------------------------------------
+        #
+        # Every transaction belonging to this Purchase Order gets one
+        # expandable detail row underneath the main Order No. row.
+        #
+        # These rows reference the transaction table directly.
+        #
+        # ---------------------------------------------------------------------
 
         for _, transaction in order_group.iterrows():
 
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
             # FIND ORIGINAL TRANSACTION ROW
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
 
             original_index = transaction.name
 
-            dataframe_position = (
-                supplier_df.index.get_loc(
-                    original_index
+            try:
+
+                dataframe_position = (
+                    supplier_df.index.get_loc(
+                        original_index
+                    )
                 )
-            )
+
+            except Exception as exc:
+
+                raise ValueError(
+                    f"Could not determine transaction worksheet row "
+                    f"for Order No. '{order_no}'."
+                ) from exc
 
             transaction_row = (
                 transaction_first_data_row
                 + dataframe_position
             )
 
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
+            # MOVE TO NEXT DETAIL ROW
+            # -----------------------------------------------------------------
+
+            detail_row = current_row + 1
+
+            # -----------------------------------------------------------------
             # ARTICLE
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
 
             detail_article = sheet.cell(
-                current_row + 1,
+                detail_row,
                 1
             )
 
@@ -2832,12 +2878,12 @@ def create_order_summary(
                 f"={transaction_article_letter}{transaction_row}"
             )
 
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
             # ORDERED QTY
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
 
             detail_ordered = sheet.cell(
-                current_row + 1,
+                detail_row,
                 2
             )
 
@@ -2845,12 +2891,12 @@ def create_order_summary(
                 f"={transaction_ordered_letter}{transaction_row}"
             )
 
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
             # DELIVERED QTY
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
 
             detail_delivered = sheet.cell(
-                current_row + 1,
+                detail_row,
                 3
             )
 
@@ -2858,12 +2904,12 @@ def create_order_summary(
                 f"={transaction_booked_letter}{transaction_row}"
             )
 
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
             # QTY VARIANCE
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
 
             detail_variance = sheet.cell(
-                current_row + 1,
+                detail_row,
                 4
             )
 
@@ -2871,24 +2917,22 @@ def create_order_summary(
                 f"={transaction_variance_letter}{transaction_row}"
             )
 
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
             # DELIVERY DAYS
             #
-            # Not applicable at article-detail level.
-            # ---------------------------------------------------------
+            # Delivery Days is shown only on the main Order No. row.
+            # -----------------------------------------------------------------
 
             detail_delivery = sheet.cell(
-                current_row + 1,
+                detail_row,
                 5
             )
 
             detail_delivery.value = None
 
-            # ---------------------------------------------------------
-            # DETAIL FORMATTING
-            # ---------------------------------------------------------
-
-            detail_row = current_row + 1
+            # -----------------------------------------------------------------
+            # DETAIL ROW FORMATTING
+            # -----------------------------------------------------------------
 
             for col in range(1, 6):
 
@@ -2901,11 +2945,23 @@ def create_order_summary(
                 cell.border = table_border
                 cell.font = detail_font
 
+                cell.alignment = Alignment(
+                    vertical="center"
+                )
+
+            # -----------------------------------------------------------------
+            # ARTICLE ALIGNMENT
+            # -----------------------------------------------------------------
+
             detail_article.alignment = Alignment(
                 horizontal="left",
                 vertical="center",
                 indent=1
             )
+
+            # -----------------------------------------------------------------
+            # NUMERIC ALIGNMENT
+            # -----------------------------------------------------------------
 
             for col in range(2, 5):
 
@@ -2917,17 +2973,27 @@ def create_order_summary(
                     vertical="center"
                 )
 
+            # -----------------------------------------------------------------
+            # NUMBER FORMATS
+            # -----------------------------------------------------------------
+
             detail_ordered.number_format = "#,##0.00"
+
             detail_delivered.number_format = "#,##0.00"
+
             detail_variance.number_format = "#,##0.00"
+
+            # -----------------------------------------------------------------
+            # DETAIL ROW HEIGHT
+            # -----------------------------------------------------------------
 
             sheet.row_dimensions[
                 detail_row
             ].height = 18
 
-            # ---------------------------------------------------------
-            # COLLAPSIBLE DETAIL ROW
-            # ---------------------------------------------------------
+            # -----------------------------------------------------------------
+            # MAKE DETAIL ROW COLLAPSIBLE
+            # -----------------------------------------------------------------
 
             sheet.row_dimensions[
                 detail_row
@@ -2937,32 +3003,47 @@ def create_order_summary(
                 detail_row
             ].hidden = True
 
+            # -----------------------------------------------------------------
+            # UPDATE CURRENT ROW
+            # -----------------------------------------------------------------
+
             current_row = detail_row
 
-        # -------------------------------------------------------------
-        # COLLAPSE DETAILS UNDER THIS ORDER
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------------------
+        # COLLAPSE ALL DETAILS UNDER THIS ORDER
+        # ---------------------------------------------------------------------
 
         sheet.row_dimensions[
             order_row
         ].collapsed = True
 
-        # Move to next main Order No. row
+        # ---------------------------------------------------------------------
+        # MOVE TO NEXT MAIN ORDER ROW
+        # ---------------------------------------------------------------------
+
         current_row += 1
 
-    # -------------------------------------------------------------------------
+    # =========================================================================
     # LAST MAIN ORDER SUMMARY ROW
-    # -------------------------------------------------------------------------
+    # =========================================================================
 
-    order_summary_last_data_row = (
-        order_summary_first_data_row
-        + len(valid_orders)
-        - 1
-    )
+    if valid_orders:
 
-    # -------------------------------------------------------------------------
+        order_summary_last_data_row = (
+            order_summary_first_data_row
+            + len(valid_orders)
+            - 1
+        )
+
+    else:
+
+        order_summary_last_data_row = (
+            order_summary_first_data_row - 1
+        )
+
+    # =========================================================================
     # COLUMN WIDTHS
-    # -------------------------------------------------------------------------
+    # =========================================================================
 
     sheet.column_dimensions["A"].width = max(
         sheet.column_dimensions["A"].width or 0,
@@ -2989,9 +3070,9 @@ def create_order_summary(
         15
     )
 
-    # -------------------------------------------------------------------------
+    # =========================================================================
     # RETURN
-    # -------------------------------------------------------------------------
+    # =========================================================================
 
     return (
         title_row,
