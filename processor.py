@@ -2464,6 +2464,10 @@ def create_order_summary(
         "Delivery Date"
     )
 
+    transaction_delivery_days_col = transaction_headers.get(
+        "Delivery Days"
+    )
+
     required_columns = [
         transaction_order_col,
         transaction_article_col,
@@ -2471,7 +2475,8 @@ def create_order_summary(
         transaction_booked_col,
         transaction_variance_col,
         transaction_order_date_col,
-        transaction_delivery_date_col
+        transaction_delivery_date_col,
+        transaction_delivery_days_col
     ]
 
     if any(
@@ -2514,6 +2519,11 @@ def create_order_summary(
     transaction_delivery_date_letter = get_column_letter(
         transaction_delivery_date_col
     )
+
+    transaction_delivery_days_letter = get_column_letter(
+         transaction_delivery_days_col
+    )
+        
 
     # =========================================================================
     # VALID PURCHASE ORDERS
@@ -2780,25 +2790,13 @@ def create_order_summary(
 
         delivery_days_cell.value = (
             f'=IFERROR('
-
             f'MAXIFS('
-            f'${transaction_delivery_date_letter}${transaction_first_data_row}:'
-            f'${transaction_delivery_date_letter}${transaction_last_data_row},'
-            f'${transaction_order_letter}${transaction_first_data_row}:'
-            f'${transaction_order_letter}${transaction_last_data_row},'
-            f'A{order_row}'
-            f')'
-
-            f'-'
-
-            f'MINIFS('
-            f'${transaction_order_date_letter}${transaction_first_data_row}:'
-            f'${transaction_order_date_letter}${transaction_last_data_row},'
+            f'${transaction_delivery_days_letter}${transaction_first_data_row}:'
+            f'${transaction_delivery_days_letter}${transaction_last_data_row},'
             f'${transaction_order_letter}${transaction_first_data_row}:'
             f'${transaction_order_letter}${transaction_last_data_row},'
             f'A{order_row}'
             f'),'
-
             f'0'
             f')'
         )
