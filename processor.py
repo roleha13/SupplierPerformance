@@ -3957,8 +3957,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 orders_kpi_row,
                 2
             ).value = (
-                f"=SUBTOTAL("
-                f"103,"
+                f"=COUNTA("
                 f"A{order_summary_first_data_row}:"
                 f"A{order_summary_last_data_row}"
                 f")"
@@ -3989,8 +3988,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 2
             ).value = (
                 f"=IFERROR("
-                f"SUBTOTAL("
-                f"101,"
+                f"AVERAGE("
                 f"E{order_summary_first_data_row}:"
                 f"E{order_summary_last_data_row}"
                 f"),"
