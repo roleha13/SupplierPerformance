@@ -3246,6 +3246,7 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
 
         # =========================================================
         # LIVE TRANSACTION FORMULAS
+        # =========================================================
         #
         # These calculations are performed directly in Excel.
         #
@@ -3258,7 +3259,6 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         # Variance Value
         #     = Variance QTY × PO Price
         #
-        # IMPORTANT:
         # "Variance Value" is the monetary variance used by the
         # TOTAL row and Supplier KPI Summary.
         # =========================================================
@@ -3352,8 +3352,8 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         # table.
         #
         # This ensures format_worksheet() does not format the TOTAL
-        # row, helper table, KPI panel, article summary, or charts
-        # as transaction data.
+        # row, KPI panel, Order No. Summary, article summary, or
+        # charts as transaction data.
         # =========================================================
 
         worksheet_last_rows[
@@ -3422,7 +3422,6 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         # =========================================================
         # TOTAL - VARIANCE VALUE
         #
-        # IMPORTANT:
         # This is the monetary variance used by the KPI and
         # Master Summary.
         # =========================================================
@@ -3536,33 +3535,25 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             ).number_format = "#,##0.00"
 
         # =========================================================
-        # HELPER TABLE
+        # THREE BLANK ROWS AFTER TOTAL
         # =========================================================
-
+        #
         # Layout:
         #
-        # Data
+        # Transaction Data
         # TOTAL
-        # blank row
-        # Helper Table
-
-        helper_start = total_row + 2
-
-        helper_end = create_helper_table(
-            sheet,
-            supplier_df,
-            helper_start
-        )
-
-        # =========================================================
-        # KPI PANEL
+        # blank
+        # blank
+        # blank
+        # Supplier KPI Summary
+        #
         # =========================================================
 
-        start_row = sheet.max_row + 3
+        start_row = total_row + 4
 
-        # ---------------------------------------------------------
+        # =========================================================
         # KPI PANEL STYLES
-        # ---------------------------------------------------------
+        # =========================================================
 
         kpi_border = Border(
             left=thin,
@@ -3760,31 +3751,10 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             )
 
             # =====================================================
-            # ORDERS
-            # =====================================================
-
-            if kpi == "Orders":
-
-                if helper_end >= helper_start + 1:
-
-                    value_cell.value = (
-                        f"=COUNTA("
-                        f"AA{helper_start + 1}:"
-                        f"AA{helper_end}"
-                        f")"
-                    )
-
-                else:
-
-                    value_cell.value = 0
-
-                value_cell.number_format = "0"
-
-            # =====================================================
             # ORDERED QTY
             # =====================================================
 
-            elif kpi == "Ordered Qty":
+            if kpi == "Ordered Qty":
 
                 if ordered_col:
 
@@ -3821,14 +3791,6 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             # =====================================================
 
             elif kpi == "Order Fulfillment Rate %":
-
-                # Because the KPI header row was added:
-                #
-                # start_row + 1 = KPI / Value header
-                # start_row + 2 = Orders
-                # start_row + 3 = Ordered Qty
-                # start_row + 4 = Received Qty
-                # start_row + 5 = Order Fulfillment Rate %
 
                 ordered_kpi_row = (
                     start_row + 3
@@ -3870,11 +3832,8 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
             # =====================================================
             # VARIANCE VALUE
             #
-            # IMPORTANT:
-            # The KPI is explicitly called "Variance Value".
-            #
-            # It references the TOTAL of the "Variance Value"
-            # transaction column.
+            # The KPI explicitly uses the monetary
+            # "Variance Value" column.
             # =====================================================
 
             elif kpi == "Variance Value":
@@ -3892,27 +3851,23 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 value_cell.number_format = "#,##0.00"
 
             # =====================================================
-            # AVERAGE DELIVERY DAYS
+            # ORDERS / AVERAGE DELIVERY DAYS
+            #
+            # These are deliberately left blank for now.
+            #
+            # They will be populated AFTER create_order_summary()
+            # because the Order No. Summary is created below the
+            # KPI panel.
             # =====================================================
+
+            elif kpi == "Orders":
+
+                value_cell.value = None
+                value_cell.number_format = "0"
 
             elif kpi == "Average Delivery Days":
 
-                if helper_end >= helper_start + 1:
-
-                    value_cell.value = (
-                        f"=IFERROR("
-                        f"AVERAGE("
-                        f"AB{helper_start + 1}:"
-                        f"AB{helper_end}"
-                        f"),"
-                        f"0"
-                        f")"
-                    )
-
-                else:
-
-                    value_cell.value = 0
-
+                value_cell.value = None
                 value_cell.number_format = "0.0"
 
         # =========================================================
@@ -3935,18 +3890,141 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
         )
 
         # =========================================================
-        # MONTHLY ARTICLE SUMMARY
+        # ORDER NO. SUMMARY
+        # =========================================================
+        #
+        # Layout:
+        #
+        # Supplier KPI Summary
+        #
+        # [3 blank rows]
+        #
+        # Order No. Summary
+        # Order No. | Ordered Qty | Delivered Qty |
+        # Qty Variance | Delivery Days
+        #
+        # PO 1
+        #     article detail
+        #     article detail
+        #
+        # PO 2
+        #     article detail
+        #
         # =========================================================
 
-        # Added one extra KPI header row.
-        #
-        # Therefore the article summary starts one row lower.
-
-        summary_start = (
+        order_summary_start = (
             start_row
             + len(kpi_labels)
             + 5
         )
+
+        (
+            order_summary_title_row,
+            order_summary_header_row,
+            order_summary_first_data_row,
+            order_summary_last_data_row
+        ) = create_order_summary(
+            sheet,
+            supplier_df,
+            order_summary_start,
+            2,
+            last_data_row
+        )
+
+        # =========================================================
+        # UPDATE KPI FORMULAS USING ORDER NO. SUMMARY
+        # =========================================================
+        #
+        # The Order No. Summary contains:
+        #
+        # Main Order rows = visible
+        # Article detail rows = hidden
+        #
+        # We therefore use SUBTOTAL so Excel counts/averages only
+        # the visible main Order No. rows and ignores the hidden
+        # article detail rows.
+        # =========================================================
+
+        # ---------------------------------------------------------
+        # ORDERS KPI
+        # ---------------------------------------------------------
+
+        orders_kpi_row = start_row + 2
+
+        if order_summary_last_data_row >= order_summary_first_data_row:
+
+            sheet.cell(
+                orders_kpi_row,
+                2
+            ).value = (
+                f"=SUBTOTAL("
+                f"103,"
+                f"A{order_summary_first_data_row}:"
+                f"A{order_summary_last_data_row}"
+                f")"
+            )
+
+        else:
+
+            sheet.cell(
+                orders_kpi_row,
+                2
+            ).value = 0
+
+        sheet.cell(
+            orders_kpi_row,
+            2
+        ).number_format = "0"
+
+        # ---------------------------------------------------------
+        # AVERAGE DELIVERY DAYS KPI
+        # ---------------------------------------------------------
+
+        average_delivery_kpi_row = start_row + 8
+
+        if order_summary_last_data_row >= order_summary_first_data_row:
+
+            sheet.cell(
+                average_delivery_kpi_row,
+                2
+            ).value = (
+                f"=IFERROR("
+                f"SUBTOTAL("
+                f"101,"
+                f"E{order_summary_first_data_row}:"
+                f"E{order_summary_last_data_row}"
+                f"),"
+                f"0"
+                f")"
+            )
+
+        else:
+
+            sheet.cell(
+                average_delivery_kpi_row,
+                2
+            ).value = 0
+
+        sheet.cell(
+            average_delivery_kpi_row,
+            2
+        ).number_format = "0.0"
+
+        # =========================================================
+        # MONTHLY ARTICLE SUMMARY
+        # =========================================================
+        #
+        # The Order No. Summary contains both main Order rows and
+        # hidden article detail rows.
+        #
+        # Therefore we use sheet.max_row AFTER create_order_summary()
+        # so the Monthly Article Summary starts below the entire
+        # Order No. Summary.
+        #
+        # Three blank rows are left between the sections.
+        # =========================================================
+
+        summary_start = sheet.max_row + 4
 
         article_start, summary_rows, article_summary = (
             create_article_summary(
