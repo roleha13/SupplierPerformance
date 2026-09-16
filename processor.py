@@ -2318,86 +2318,687 @@ def create_article_summary(sheet, supplier_df, start_row):
 
 
 ###############################################################################
-# HELPER TABLE
+# ORDER NO. SUMMARY
 ###############################################################################
 
-def create_helper_table(sheet, supplier_df, start_row):
+def create_order_summary(
+    sheet,
+    supplier_df,
+    start_row,
+    transaction_first_data_row,
+    transaction_last_data_row
+):
     """
-    Creates a hidden helper table containing one row per valid Purchase Order.
+    Creates a visible Order No. Summary with expandable article details.
 
-    The helper table is used for:
-        - Orders count
-        - Average Delivery Days
+    Structure:
 
-    AA = Order No.
-    AB = Delivery Days
+        Order No. | Ordered Qty | Delivered Qty | Qty Variance | Delivery Days
+            Article detail
+            Article detail
 
-    One row is created for each unique Purchase Order.
+        Order No. | Ordered Qty | Delivered Qty | Qty Variance | Delivery Days
+            Article detail
+            Article detail
+
+    The main Order No. rows use LIVE EXCEL FORMULAS referencing
+    the supplier transaction table.
+
+    Article detail rows also use LIVE EXCEL FORMULAS referencing
+    the supplier transaction table.
+
+    Returns
+    -------
+    order_summary_start : int
+        First row containing the Order No. Summary title.
+
+    order_summary_header_row : int
+        Row containing the Order No. Summary headers.
+
+    order_summary_first_data_row : int
+        First Order No. data row.
+
+    order_summary_last_data_row : int
+        Last Order No. summary row.
     """
+
+    from openpyxl.styles import (
+        Font,
+        PatternFill,
+        Border,
+        Side,
+        Alignment
+    )
+    from openpyxl.utils import get_column_letter
 
     # -------------------------------------------------------------------------
-    # Prepare helper data
+    # STYLES
     # -------------------------------------------------------------------------
 
-    helper = (
+    title_fill = PatternFill(
+        fill_type="solid",
+        fgColor=HEADER_FILL
+    )
+
+    header_fill = PatternFill(
+        fill_type="solid",
+        fgColor="D9EAD3"
+    )
+
+    detail_fill = PatternFill(
+        fill_type="solid",
+        fgColor="F7F7F7"
+    )
+
+    title_font = Font(
+        color=HEADER_FONT,
+        bold=True,
+        size=12
+    )
+
+    header_font = Font(
+        bold=True,
+        size=10
+    )
+
+    main_font = Font(
+        bold=False,
+        size=10
+    )
+
+    detail_font = Font(
+        italic=True,
+        size=9
+    )
+
+    thin_side = Side(
+        style="thin",
+        color="B7B7B7"
+    )
+
+    table_border = Border(
+        left=thin_side,
+        right=thin_side,
+        top=thin_side,
+        bottom=thin_side
+    )
+
+    # -------------------------------------------------------------------------
+    # FIND TRANSACTION COLUMNS
+    # -------------------------------------------------------------------------
+
+    transaction_headers = {
+        str(sheet.cell(1, col).value).strip(): col
+        for col in range(
+            1,
+            sheet.max_column + 1
+        )
+    }
+
+    transaction_order_col = transaction_headers.get(
+        "Order No."
+    )
+
+    transaction_article_col = transaction_headers.get(
+        "Article"
+    )
+
+    transaction_ordered_col = transaction_headers.get(
+        "Ordered"
+    )
+
+    transaction_booked_col = transaction_headers.get(
+        "Booked QTY"
+    )
+
+    transaction_variance_col = transaction_headers.get(
+        "Variance QTY"
+    )
+
+    transaction_order_date_col = transaction_headers.get(
+        "Order Date"
+    )
+
+    transaction_delivery_date_col = transaction_headers.get(
+        "Delivery Date"
+    )
+
+    required_columns = [
+        transaction_order_col,
+        transaction_article_col,
+        transaction_ordered_col,
+        transaction_booked_col,
+        transaction_variance_col,
+        transaction_order_date_col,
+        transaction_delivery_date_col
+    ]
+
+    if any(
+        column is None
+        for column in required_columns
+    ):
+        raise ValueError(
+            "Could not find all required transaction columns "
+            "for the Order No. Summary."
+        )
+
+    # -------------------------------------------------------------------------
+    # TRANSACTION COLUMN LETTERS
+    # -------------------------------------------------------------------------
+
+    transaction_order_letter = get_column_letter(
+        transaction_order_col
+    )
+
+    transaction_article_letter = get_column_letter(
+        transaction_article_col
+    )
+
+    transaction_ordered_letter = get_column_letter(
+        transaction_ordered_col
+    )
+
+    transaction_booked_letter = get_column_letter(
+        transaction_booked_col
+    )
+
+    transaction_variance_letter = get_column_letter(
+        transaction_variance_col
+    )
+
+    transaction_order_date_letter = get_column_letter(
+        transaction_order_date_col
+    )
+
+    transaction_delivery_date_letter = get_column_letter(
+        transaction_delivery_date_col
+    )
+
+    # -------------------------------------------------------------------------
+    # VALID PURCHASE ORDERS
+    # -------------------------------------------------------------------------
+
+    valid_orders = (
         supplier_df[
             supplier_df["Order No."].notna()
             & ~supplier_df["Order No."].astype(str).str.strip().isin(
-                ["", "NO PO DEFINED", "N/A", "NONE"]
+                [
+                    "",
+                    "NO PO DEFINED",
+                    "N/A",
+                    "NONE"
+                ]
             )
         ]
-        .groupby("Order No.", as_index=False)
-        .agg(
-            Order_Date=("Order Date", "first"),
-            Last_Delivery_Date=("Delivery Date", "max")
+        .groupby(
+            "Order No.",
+            sort=True
         )
     )
 
     # -------------------------------------------------------------------------
-    # Calculate Delivery Days
+    # TITLE
     # -------------------------------------------------------------------------
 
-    helper["Delivery Days"] = (
-        helper["Last_Delivery_Date"]
-        - helper["Order_Date"]
-    ).dt.days
+    title_row = start_row
+
+    sheet.merge_cells(
+        start_row=title_row,
+        start_column=1,
+        end_row=title_row,
+        end_column=5
+    )
+
+    title_cell = sheet.cell(
+        title_row,
+        1
+    )
+
+    title_cell.value = "Order No. Summary"
+    title_cell.fill = title_fill
+    title_cell.font = title_font
+
+    title_cell.alignment = Alignment(
+        horizontal="left",
+        vertical="center"
+    )
+
+    title_cell.border = table_border
+
+    for col in range(1, 6):
+
+        cell = sheet.cell(
+            title_row,
+            col
+        )
+
+        cell.fill = title_fill
+        cell.border = table_border
+
+    sheet.row_dimensions[
+        title_row
+    ].height = 24
 
     # -------------------------------------------------------------------------
-    # Write Helper Table Headers
+    # SPACE BETWEEN TITLE AND HEADER
     # -------------------------------------------------------------------------
 
-    sheet.cell(start_row, 27).value = "Order No."
-    sheet.cell(start_row, 28).value = "Delivery Days"
+    header_row = title_row + 2
 
     # -------------------------------------------------------------------------
-    # Write Helper Table Data
+    # HEADERS
     # -------------------------------------------------------------------------
 
-    row = start_row + 1
+    headers = [
+        "Order No.",
+        "Ordered Qty",
+        "Delivered Qty",
+        "Qty Variance",
+        "Delivery Days"
+    ]
 
-    for _, order in helper.iterrows():
+    for col, header in enumerate(
+        headers,
+        start=1
+    ):
 
-        sheet.cell(row, 27).value = order["Order No."]
-        sheet.cell(row, 28).value = order["Delivery Days"]
+        cell = sheet.cell(
+            header_row,
+            col
+        )
 
-        row += 1
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.border = table_border
+
+        cell.alignment = Alignment(
+            horizontal="center",
+            vertical="center"
+        )
+
+    sheet.row_dimensions[
+        header_row
+    ].height = 21
 
     # -------------------------------------------------------------------------
-    # Hide Helper Columns
+    # FIRST ORDER SUMMARY ROW
     # -------------------------------------------------------------------------
 
-    # AA = column 27
-    # AB = column 28
+    current_row = header_row + 1
 
-    sheet.column_dimensions["AA"].hidden = True
-    sheet.column_dimensions["AB"].hidden = True
+    order_summary_first_data_row = current_row
 
     # -------------------------------------------------------------------------
-    # Return Last Helper Row
+    # WRITE ONE ROW PER UNIQUE ORDER
     # -------------------------------------------------------------------------
 
-    return row - 1
+    for order_no, order_group in valid_orders:
 
+        order_row = current_row
+
+        # -------------------------------------------------------------
+        # ORDER NUMBER
+        # -------------------------------------------------------------
+
+        order_cell = sheet.cell(
+            order_row,
+            1
+        )
+
+        order_cell.value = order_no
+        order_cell.border = table_border
+        order_cell.font = main_font
+
+        order_cell.alignment = Alignment(
+            horizontal="left",
+            vertical="center"
+        )
+
+        # -------------------------------------------------------------
+        # ORDERED QTY
+        # -------------------------------------------------------------
+
+        ordered_cell = sheet.cell(
+            order_row,
+            2
+        )
+
+        ordered_cell.value = (
+            f'=SUMIF('
+            f'${transaction_order_letter}${transaction_first_data_row}:'
+            f'${transaction_order_letter}${transaction_last_data_row},'
+            f'A{order_row},'
+            f'${transaction_ordered_letter}${transaction_first_data_row}:'
+            f'${transaction_ordered_letter}${transaction_last_data_row}'
+            f')'
+        )
+
+        ordered_cell.number_format = "#,##0.00"
+        ordered_cell.border = table_border
+        ordered_cell.font = main_font
+
+        ordered_cell.alignment = Alignment(
+            horizontal="right",
+            vertical="center"
+        )
+
+        # -------------------------------------------------------------
+        # DELIVERED QTY
+        # -------------------------------------------------------------
+
+        delivered_cell = sheet.cell(
+            order_row,
+            3
+        )
+
+        delivered_cell.value = (
+            f'=SUMIF('
+            f'${transaction_order_letter}${transaction_first_data_row}:'
+            f'${transaction_order_letter}${transaction_last_data_row},'
+            f'A{order_row},'
+            f'${transaction_booked_letter}${transaction_first_data_row}:'
+            f'${transaction_booked_letter}${transaction_last_data_row}'
+            f')'
+        )
+
+        delivered_cell.number_format = "#,##0.00"
+        delivered_cell.border = table_border
+        delivered_cell.font = main_font
+
+        delivered_cell.alignment = Alignment(
+            horizontal="right",
+            vertical="center"
+        )
+
+        # -------------------------------------------------------------
+        # QTY VARIANCE
+        # -------------------------------------------------------------
+
+        variance_cell = sheet.cell(
+            order_row,
+            4
+        )
+
+        variance_cell.value = (
+            f"=B{order_row}-C{order_row}"
+        )
+
+        variance_cell.number_format = "#,##0.00"
+        variance_cell.border = table_border
+        variance_cell.font = main_font
+
+        variance_cell.alignment = Alignment(
+            horizontal="right",
+            vertical="center"
+        )
+
+        # -------------------------------------------------------------
+        # DELIVERY DAYS
+        #
+        # Latest Delivery Date - Earliest Order Date
+        # for the Purchase Order.
+        # -------------------------------------------------------------
+
+        delivery_days_cell = sheet.cell(
+            order_row,
+            5
+        )
+
+        delivery_days_cell.value = (
+            f'=IFERROR('
+            f'MAXIFS('
+            f'${transaction_delivery_date_letter}${transaction_first_data_row}:'
+            f'${transaction_delivery_date_letter}${transaction_last_data_row},'
+            f'${transaction_order_letter}${transaction_first_data_row}:'
+            f'${transaction_order_letter}${transaction_last_data_row},'
+            f'A{order_row}'
+            f')'
+            f'-'
+            f'MINIFS('
+            f'${transaction_order_date_letter}${transaction_first_data_row}:'
+            f'${transaction_order_date_letter}${transaction_last_data_row},'
+            f'${transaction_order_letter}${transaction_first_data_row}:'
+            f'${transaction_order_letter}${transaction_last_data_row},'
+            f'A{order_row}'
+            f'),'
+            f'0'
+            f')'
+        )
+
+        delivery_days_cell.number_format = "0.0"
+        delivery_days_cell.border = table_border
+        delivery_days_cell.font = main_font
+
+        delivery_days_cell.alignment = Alignment(
+            horizontal="right",
+            vertical="center"
+        )
+
+        # -------------------------------------------------------------
+        # ROW HEIGHT
+        # -------------------------------------------------------------
+
+        sheet.row_dimensions[
+            order_row
+        ].height = 20
+
+        # -------------------------------------------------------------
+        # FIND TRANSACTIONS FOR THIS ORDER
+        # -------------------------------------------------------------
+
+        detail = order_group[
+            [
+                "Article",
+                "Order No."
+            ]
+        ]
+
+        # -------------------------------------------------------------
+        # ARTICLE DETAIL ROWS
+        # -------------------------------------------------------------
+
+        detail_start_row = current_row + 1
+
+        for _, transaction in order_group.iterrows():
+
+            # ---------------------------------------------------------
+            # FIND ORIGINAL TRANSACTION ROW
+            # ---------------------------------------------------------
+
+            original_index = transaction.name
+
+            dataframe_position = (
+                supplier_df.index.get_loc(
+                    original_index
+                )
+            )
+
+            transaction_row = (
+                transaction_first_data_row
+                + dataframe_position
+            )
+
+            # ---------------------------------------------------------
+            # ARTICLE
+            # ---------------------------------------------------------
+
+            detail_article = sheet.cell(
+                current_row + 1,
+                1
+            )
+
+            detail_article.value = (
+                f"={transaction_article_letter}{transaction_row}"
+            )
+
+            # ---------------------------------------------------------
+            # ORDERED QTY
+            # ---------------------------------------------------------
+
+            detail_ordered = sheet.cell(
+                current_row + 1,
+                2
+            )
+
+            detail_ordered.value = (
+                f"={transaction_ordered_letter}{transaction_row}"
+            )
+
+            # ---------------------------------------------------------
+            # DELIVERED QTY
+            # ---------------------------------------------------------
+
+            detail_delivered = sheet.cell(
+                current_row + 1,
+                3
+            )
+
+            detail_delivered.value = (
+                f"={transaction_booked_letter}{transaction_row}"
+            )
+
+            # ---------------------------------------------------------
+            # QTY VARIANCE
+            # ---------------------------------------------------------
+
+            detail_variance = sheet.cell(
+                current_row + 1,
+                4
+            )
+
+            detail_variance.value = (
+                f"={transaction_variance_letter}{transaction_row}"
+            )
+
+            # ---------------------------------------------------------
+            # DELIVERY DAYS
+            #
+            # Not applicable at article-detail level.
+            # ---------------------------------------------------------
+
+            detail_delivery = sheet.cell(
+                current_row + 1,
+                5
+            )
+
+            detail_delivery.value = None
+
+            # ---------------------------------------------------------
+            # DETAIL FORMATTING
+            # ---------------------------------------------------------
+
+            detail_row = current_row + 1
+
+            for col in range(1, 6):
+
+                cell = sheet.cell(
+                    detail_row,
+                    col
+                )
+
+                cell.fill = detail_fill
+                cell.border = table_border
+                cell.font = detail_font
+
+            detail_article.alignment = Alignment(
+                horizontal="left",
+                vertical="center",
+                indent=1
+            )
+
+            for col in range(2, 5):
+
+                sheet.cell(
+                    detail_row,
+                    col
+                ).alignment = Alignment(
+                    horizontal="right",
+                    vertical="center"
+                )
+
+            detail_ordered.number_format = "#,##0.00"
+            detail_delivered.number_format = "#,##0.00"
+            detail_variance.number_format = "#,##0.00"
+
+            sheet.row_dimensions[
+                detail_row
+            ].height = 18
+
+            # ---------------------------------------------------------
+            # COLLAPSIBLE DETAIL ROW
+            # ---------------------------------------------------------
+
+            sheet.row_dimensions[
+                detail_row
+            ].outlineLevel = 1
+
+            sheet.row_dimensions[
+                detail_row
+            ].hidden = True
+
+            current_row = detail_row
+
+        # -------------------------------------------------------------
+        # COLLAPSE DETAILS UNDER THIS ORDER
+        # -------------------------------------------------------------
+
+        sheet.row_dimensions[
+            order_row
+        ].collapsed = True
+
+        # Move to next main Order No. row
+        current_row += 1
+
+    # -------------------------------------------------------------------------
+    # LAST MAIN ORDER SUMMARY ROW
+    # -------------------------------------------------------------------------
+
+    order_summary_last_data_row = (
+        order_summary_first_data_row
+        + len(valid_orders)
+        - 1
+    )
+
+    # -------------------------------------------------------------------------
+    # COLUMN WIDTHS
+    # -------------------------------------------------------------------------
+
+    sheet.column_dimensions["A"].width = max(
+        sheet.column_dimensions["A"].width or 0,
+        28
+    )
+
+    sheet.column_dimensions["B"].width = max(
+        sheet.column_dimensions["B"].width or 0,
+        15
+    )
+
+    sheet.column_dimensions["C"].width = max(
+        sheet.column_dimensions["C"].width or 0,
+        16
+    )
+
+    sheet.column_dimensions["D"].width = max(
+        sheet.column_dimensions["D"].width or 0,
+        15
+    )
+
+    sheet.column_dimensions["E"].width = max(
+        sheet.column_dimensions["E"].width or 0,
+        15
+    )
+
+    # -------------------------------------------------------------------------
+    # RETURN
+    # -------------------------------------------------------------------------
+
+    return (
+        title_row,
+        header_row,
+        order_summary_first_data_row,
+        order_summary_last_data_row
+    )
 ###############################################################################
 # SUPPLIER WORKSHEETS
 ###############################################################################
