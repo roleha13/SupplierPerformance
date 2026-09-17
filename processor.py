@@ -4083,7 +4083,7 @@ def build_workbook(report_df):
     # Make it the active sheet
     wb.active = 0
 
-    return wb, worksheet_last_rows
+    return wb, worksheet_last_rows, supplier_sheet_map
 
 ###############################################################################
 # EXCEL FORMATTING
@@ -4916,6 +4916,190 @@ def add_dashboard(master_ws, report_df):
         ].height = 22
 
         start_row += 1
+
+###############################################################################
+# FINALIZE MASTER SUMMARY AVERAGE DELIVERY DAYS LINKS
+###############################################################################
+
+def finalize_master_summary_delivery_links(
+    workbook,
+    supplier_sheet_map
+):
+    """
+    Ensures the Master Summary Average Delivery Days cells
+    contain LIVE Excel references to the Supplier KPI Summary.
+
+    Example:
+
+        Master Summary cell displays:
+            19.0
+
+        Formula bar shows:
+            ='NAJMAZ ENTERPRISES'!B30
+    """
+
+    master = workbook[MASTER_SHEET]
+
+    # Master Summary table header
+    header_row = 11
+
+    # Find the required Master Summary columns
+    headers = {
+        str(cell.value).strip(): cell.column
+        for cell in master[header_row]
+        if cell.value is not None
+    }
+
+    supplier_col = headers.get(
+        "Supplier"
+    )
+
+    avg_days_col = headers.get(
+        "Average Delivery Days"
+    )
+
+    if supplier_col is None:
+        raise ValueError(
+            "Master Summary 'Supplier' column was not found."
+        )
+
+    if avg_days_col is None:
+        raise ValueError(
+            "Master Summary 'Average Delivery Days' column "
+            "was not found."
+        )
+
+    # ---------------------------------------------------------
+    # LOOP THROUGH SUPPLIER ROWS
+    # ---------------------------------------------------------
+
+    for row in range(
+        header_row + 1,
+        master.max_row + 1
+    ):
+
+        supplier_name = master.cell(
+            row,
+            supplier_col
+        ).value
+
+        if supplier_name is None:
+            continue
+
+        supplier_name = str(
+            supplier_name
+        ).strip()
+
+        # -----------------------------------------------------
+        # Find actual supplier worksheet
+        # -----------------------------------------------------
+
+        sheet_name = supplier_sheet_map.get(
+            supplier_name
+        )
+
+        if not sheet_name:
+            continue
+
+        supplier_sheet = workbook[
+            sheet_name
+        ]
+
+        # -----------------------------------------------------
+        # Find Supplier KPI Summary
+        # -----------------------------------------------------
+
+        kpi_title_row = None
+
+        for search_row in range(
+            1,
+            supplier_sheet.max_row + 1
+        ):
+
+            value = supplier_sheet.cell(
+                search_row,
+                1
+            ).value
+
+            if (
+                str(value).strip()
+                == "Supplier KPI Summary"
+            ):
+
+                kpi_title_row = search_row
+                break
+
+        if kpi_title_row is None:
+            raise ValueError(
+                f"Supplier KPI Summary not found "
+                f"on '{sheet_name}'."
+            )
+
+        # -----------------------------------------------------
+        # Find Average Delivery Days KPI
+        # -----------------------------------------------------
+
+        average_delivery_row = None
+
+        for search_row in range(
+            kpi_title_row + 1,
+            kpi_title_row + 9
+        ):
+
+            value = supplier_sheet.cell(
+                search_row,
+                1
+            ).value
+
+            if (
+                str(value).strip()
+                == "Average Delivery Days"
+            ):
+
+                average_delivery_row = search_row
+                break
+
+        if average_delivery_row is None:
+            raise ValueError(
+                f"'Average Delivery Days' KPI not found "
+                f"on '{sheet_name}'."
+            )
+
+        # -----------------------------------------------------
+        # WRITE THE LIVE MASTER SUMMARY FORMULA
+        # -----------------------------------------------------
+
+        master_cell = master.cell(
+            row,
+            avg_days_col
+        )
+
+        master_cell.value = (
+            f"='{sheet_name}'!"
+            f"B{average_delivery_row}"
+        )
+
+        master_cell.number_format = "0.0"
+
+        # -----------------------------------------------------
+        # VERIFY IT IS ACTUALLY A FORMULA
+        # -----------------------------------------------------
+
+        if not (
+            isinstance(
+                master_cell.value,
+                str
+            )
+            and master_cell.value.startswith("=")
+        ):
+
+            raise ValueError(
+                f"Master Summary cell "
+                f"{master_cell.coordinate} for "
+                f"'{supplier_name}' was not written "
+                f"as a live Excel formula."
+            )
+
 ###############################################################################
 # SAVE REPORT
 ###############################################################################
@@ -4977,7 +5161,7 @@ def process_files(
     # Build workbook
     # ---------------------------------------------------------
 
-    workbook, worksheet_last_rows = build_workbook(report_df)
+    workbook, worksheet_last_rows, supplier_sheet_map = build_workbook(report_df)
     
     # ---------------------------------------------------------
     # Add dashboard
@@ -5005,6 +5189,12 @@ def process_files(
             )
 
             apply_conditional_formatting(sheet,last_data_row)
+
+    finalize_master_summary_delivery_links(
+        workbook,
+        supplier_sheet_map
+    )
+        
     # ---------------------------------------------------------
     # Return workbook and report period
     # ---------------------------------------------------------
