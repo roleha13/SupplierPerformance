@@ -2317,9 +2317,9 @@ def create_article_summary(sheet, supplier_df, start_row):
     )
 
 
-###############################################################################
+# =========================================================================
 # ORDER NO. SUMMARY
-###############################################################################
+# =========================================================================
 
 def create_order_summary(
     sheet,
@@ -2432,7 +2432,7 @@ def create_order_summary(
         str(sheet.cell(1, col).value).strip(): col
         for col in range(
             1,
-            transaction_last_data_row * 0 + sheet.max_column + 1
+            sheet.max_column + 1
         )
     }
 
@@ -2521,20 +2521,11 @@ def create_order_summary(
     )
 
     transaction_delivery_days_letter = get_column_letter(
-         transaction_delivery_days_col
+        transaction_delivery_days_col
     )
-        
 
     # =========================================================================
     # VALID PURCHASE ORDERS
-    # =========================================================================
-    #
-    # IMPORTANT:
-    # Convert the GroupBy object to an explicit list.
-    #
-    # This makes the number of unique order groups predictable and allows
-    # len(valid_orders) to be used safely later.
-    #
     # =========================================================================
 
     valid_order_df = (
@@ -2682,6 +2673,20 @@ def create_order_summary(
         )
 
         # ---------------------------------------------------------------------
+        # EXACT ORDER NUMBER CELL REFERENCE
+        #
+        # This ensures all formulas reference the actual Order No. cell.
+        #
+        # Example:
+        #     order_row = 112
+        #     order_cell.coordinate = "A112"
+        #
+        # This prevents accidental references such as A1121.
+        # ---------------------------------------------------------------------
+
+        order_reference = order_cell.coordinate
+
+        # ---------------------------------------------------------------------
         # ORDERED QTY
         #
         # LIVE FORMULA:
@@ -2697,7 +2702,7 @@ def create_order_summary(
             f'=SUMIF('
             f'${transaction_order_letter}${transaction_first_data_row}:'
             f'${transaction_order_letter}${transaction_last_data_row},'
-            f'A{order_row},'
+            f'{order_reference},'
             f'${transaction_ordered_letter}${transaction_first_data_row}:'
             f'${transaction_ordered_letter}${transaction_last_data_row}'
             f')'
@@ -2728,7 +2733,7 @@ def create_order_summary(
             f'=SUMIF('
             f'${transaction_order_letter}${transaction_first_data_row}:'
             f'${transaction_order_letter}${transaction_last_data_row},'
-            f'A{order_row},'
+            f'{order_reference},'
             f'${transaction_booked_letter}${transaction_first_data_row}:'
             f'${transaction_booked_letter}${transaction_last_data_row}'
             f')'
@@ -2776,11 +2781,24 @@ def create_order_summary(
         #
         # LIVE FORMULA:
         #
-        # Latest Delivery Date
-        # minus
-        # Earliest Order Date
+        # Returns the highest transaction-level Delivery Days
+        # for the current Purchase Order.
         #
-        # for this Purchase Order.
+        # MAXIFS finds the maximum Delivery Days value where
+        # the transaction Order No. matches the current Order No.
+        #
+        # IMPORTANT:
+        # The formula references order_reference, which is the exact
+        # coordinate of the Order No. cell.
+        #
+        # Example:
+        #
+        #     A112 = TML202606-06671
+        #
+        # Formula:
+        #
+        #     =IFERROR(MAXIFS($G$2:$G$92,$D$2:$D$92,A112),0)
+        #
         # ---------------------------------------------------------------------
 
         delivery_days_cell = sheet.cell(
@@ -2790,15 +2808,12 @@ def create_order_summary(
 
         delivery_days_cell.value = (
             f'=IFERROR('
-            f'AGGREGATE('
-            f'14,'
-            f'6,'
+            f'MAXIFS('
             f'${transaction_delivery_days_letter}${transaction_first_data_row}:'
             f'${transaction_delivery_days_letter}${transaction_last_data_row},'
             f'${transaction_order_letter}${transaction_first_data_row}:'
             f'${transaction_order_letter}${transaction_last_data_row},'
-            f'A{order_row}'
-            f'1'
+            f'{order_reference}'
             f'),'
             f'0'
             f')'
@@ -2823,13 +2838,6 @@ def create_order_summary(
 
         # ---------------------------------------------------------------------
         # ARTICLE DETAIL ROWS
-        # ---------------------------------------------------------------------
-        #
-        # Every transaction belonging to this Purchase Order gets one
-        # expandable detail row underneath the main Order No. row.
-        #
-        # These rows reference the transaction table directly.
-        #
         # ---------------------------------------------------------------------
 
         for _, transaction in order_group.iterrows():
