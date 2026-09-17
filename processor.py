@@ -2812,7 +2812,7 @@ def create_order_summary(
             f'${transaction_delivery_days_letter}${transaction_first_data_row}:'
             f'${transaction_delivery_days_letter}${transaction_last_data_row}/('
             f'${transaction_order_letter}${transaction_first_data_row}:'
-            f'${transaction_order_letter}${transaction_last_data_row},'
+            f'${transaction_order_letter}${transaction_last_data_row}=,'
             f'{order_reference}'
             f'),1),'
             f'0'
