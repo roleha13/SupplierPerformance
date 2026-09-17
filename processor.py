@@ -2790,12 +2790,15 @@ def create_order_summary(
 
         delivery_days_cell.value = (
             f'=IFERROR('
-            f'MAXIFS('
+            f'AGGREGATE('
+            f'14,'
+            f'6,'
             f'${transaction_delivery_days_letter}${transaction_first_data_row}:'
             f'${transaction_delivery_days_letter}${transaction_last_data_row},'
             f'${transaction_order_letter}${transaction_first_data_row}:'
             f'${transaction_order_letter}${transaction_last_data_row},'
             f'A{order_row}'
+            f'1'
             f'),'
             f'0'
             f')'
