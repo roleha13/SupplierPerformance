@@ -3970,10 +3970,11 @@ def create_supplier_sheets(workbook, report_df, worksheet_last_rows):
                 orders_kpi_row,
                 2
             ).value = (
-                f"=COUNTA("
-                f"A{order_summary_first_data_row}:"
-                f"A{order_summary_last_data_row}"
-                f")"
+                f'=COUNTIF('
+                f'A{order_summary_first_data_row}:'
+                f'A{order_summary_last_data_row},'
+                f'"TML*"'
+                f')'
             )
 
         else:
