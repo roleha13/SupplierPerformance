@@ -5111,12 +5111,19 @@ def save_workbook(workbook):
 
     output = BytesIO()
 
+    # =========================================================================
+    # FORCE EXCEL TO RECALCULATE FORMULAS WHEN THE WORKBOOK IS OPENED
+    # =========================================================================
+
+    workbook.calculation.calcMode = "auto"
+    workbook.calculation.fullCalcOnLoad = True
+    workbook.calculation.forceFullCalc = True
+
     workbook.save(output)
 
     output.seek(0)
 
     return output
-
 
 ###############################################################################
 # MAIN PROCESS
