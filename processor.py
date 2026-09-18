@@ -5105,6 +5105,7 @@ def save_workbook(workbook):
     workbook.calculation.calcMode = "auto"
     workbook.calculation.fullCalcOnLoad = True
     workbook.calculation.forceFullCalc = True
+    workbook.calculation.calcOnSave = True
 
     workbook.save(output)
 
