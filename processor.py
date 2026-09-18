@@ -2642,6 +2642,9 @@ def create_order_summary(
 
     order_summary_first_data_row = current_row
 
+    order_summary_last_data_row = (
+        order_summary_first_data_row - 1
+    )
     # =========================================================================
     # WRITE ONE MAIN ROW PER UNIQUE ORDER
     # =========================================================================
@@ -2653,6 +2656,8 @@ def create_order_summary(
         # ---------------------------------------------------------------------
 
         order_row = current_row
+
+        order_summary_last_data_row = order_row
 
         # ---------------------------------------------------------------------
         # ORDER NUMBER
@@ -3024,24 +3029,6 @@ def create_order_summary(
         # ---------------------------------------------------------------------
 
         current_row += 1
-
-    # =========================================================================
-    # LAST MAIN ORDER SUMMARY ROW
-    # =========================================================================
-
-    if valid_orders:
-
-        order_summary_last_data_row = (
-            order_summary_first_data_row
-            + len(valid_orders)
-            - 1
-        )
-
-    else:
-
-        order_summary_last_data_row = (
-            order_summary_first_data_row - 1
-        )
 
     # =========================================================================
     # COLUMN WIDTHS
