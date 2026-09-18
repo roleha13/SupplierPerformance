@@ -4411,11 +4411,9 @@ def add_supplier_chart(
     followed immediately by the chart.
 
     Chart formatting:
-        - Large, clear chart title.
-        - More space between title and bars.
+        - Large chart for better readability.
         - Legend positioned on the right side.
         - Legend shows Ordered Qty and Delivered Qty.
-        - Larger chart dimensions.
         - Article labels angled to reduce overcrowding.
         - Data labels remain visible.
     """
@@ -4537,11 +4535,8 @@ def add_supplier_chart(
     # ---------------------------------------------------------
     # CHART SIZE
     #
-    # Make the chart substantially larger so that:
-    #   - bars have more space
-    #   - article names are easier to read
-    #   - the title has more visual space
-    #   - the legend does not crowd the chart
+    # Larger dimensions give the title, bars, labels,
+    # and legend more breathing room.
     # ---------------------------------------------------------
 
     chart.height = 14
@@ -4549,26 +4544,21 @@ def add_supplier_chart(
     chart.width = 28
 
     # ---------------------------------------------------------
-    # CHART TITLE
-    #
-    # Make the title larger and bold.
-    # ---------------------------------------------------------
-
-    chart.title.tx.rich.p[0].r[0].rPr.sz = 1800
-    chart.title.tx.rich.p[0].r[0].rPr.b = True
-
-    # ---------------------------------------------------------
     # LEGEND
     #
     # Put the legend on the RIGHT side.
     #
-    # Because the chart data uses:
+    # The chart data uses:
     #
     #   Ordered Qty
     #   Delivered Qty
     #
-    # as the series headers, the legend will contain
-    # only those two items.
+    # as the series names.
+    #
+    # Therefore the legend will show only:
+    #
+    #   Ordered Qty
+    #   Delivered Qty
     # ---------------------------------------------------------
 
     chart.legend.position = "r"
