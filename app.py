@@ -77,12 +77,12 @@ workbooks.
 
 The report includes:
 
-- Master Summary Dashboard
+- Master Summary KPI Dashboard
 - Supplier KPI Sheets
 - Delivery Days
-- Fill Rate
+- Order Fulfillment Rate
 - Quantity Variance
-- Price Variance
+- Variance Value
 - Charts
 """
 )
