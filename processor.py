@@ -2781,24 +2781,17 @@ def create_order_summary(
         #
         # LIVE FORMULA:
         #
-        # Returns the highest transaction-level Delivery Days
-        # for the current Purchase Order.
-        #
-        # MAXIFS finds the maximum Delivery Days value where
-        # the transaction Order No. matches the current Order No.
-        #
+        # Returns the highest transaction-level Delivery Days for the current Purchase Order.
+        # 
+        # AGGREGATE(14,6,...,1) returns the largest Delivery Days value for rows where the transaction Order No. matches the current Order No.
+        # This is used instead of MAXIFS because MAXIFS is not supported by the Excel version being used.
         # IMPORTANT:
-        # The formula references order_reference, which is the exact
-        # coordinate of the Order No. cell.
+        # The formula references order_reference, which is the exact coordinate of the Order No. cell.
+        # Example:A112 = TML202606-06671
         #
-        # Example:
+        # Formula:=IFERROR(AGGREGATE(14,6,$G$2:$G$92/($D$2:$D$92=A112),1),0)
         #
-        #     A112 = TML202606-06671
-        #
-        # Formula:
-        #
-        #     =IFERROR(MAXIFS($G$2:$G$92,$D$2:$D$92,A112),0)
-        #
+        #  Result:   6.0 
         # ---------------------------------------------------------------------
 
         delivery_days_cell = sheet.cell(
@@ -2812,7 +2805,7 @@ def create_order_summary(
             f'${transaction_delivery_days_letter}${transaction_first_data_row}:'
             f'${transaction_delivery_days_letter}${transaction_last_data_row}/('
             f'${transaction_order_letter}${transaction_first_data_row}:'
-            f'${transaction_order_letter}${transaction_last_data_row}=,'
+            f'${transaction_order_letter}${transaction_last_data_row}='
             f'{order_reference}'
             f'),1),'
             f'0'
