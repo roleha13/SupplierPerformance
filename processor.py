@@ -4573,6 +4573,12 @@ def add_supplier_chart(
 
     chart.dLbls.showVal = True
 
+    chart.dLbls.showCatName = True
+
+    chart.dLbls.showSerName = False
+
+    chart.dLbls.showLegendKey = False
+
     # ---------------------------------------------------------
     # DATA
     # ---------------------------------------------------------
