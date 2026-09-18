@@ -4404,11 +4404,20 @@ def add_supplier_chart(
     article_summary
 ):
     """
-    Creates an Ordered vs Delivered chart using the
-    article_summary DataFrame.
+    Creates an Ordered vs Delivered chart using
+    the article_summary DataFrame.
 
     A visible Chart Summary table is written first,
     followed immediately by the chart.
+
+    Chart formatting:
+        - Large, clear chart title.
+        - More space between title and bars.
+        - Legend positioned on the right side.
+        - Legend shows Ordered Qty and Delivered Qty.
+        - Larger chart dimensions.
+        - Article labels angled to reduce overcrowding.
+        - Data labels remain visible.
     """
 
     # ---------------------------------------------------------
@@ -4488,7 +4497,10 @@ def add_supplier_chart(
     # TOTAL ROW
     # ---------------------------------------------------------
 
-    ws.cell(current_row, 1).value = "TOTAL"
+    ws.cell(
+        current_row,
+        1
+    ).value = "TOTAL"
 
     ws.cell(
         current_row,
@@ -4522,13 +4534,58 @@ def add_supplier_chart(
 
     chart.x_axis.title = "Article"
 
-    chart.height = 8
+    # ---------------------------------------------------------
+    # CHART SIZE
+    #
+    # Make the chart substantially larger so that:
+    #   - bars have more space
+    #   - article names are easier to read
+    #   - the title has more visual space
+    #   - the legend does not crowd the chart
+    # ---------------------------------------------------------
 
-    chart.width = 16
+    chart.height = 14
+
+    chart.width = 28
+
+    # ---------------------------------------------------------
+    # CHART TITLE
+    #
+    # Make the title larger and bold.
+    # ---------------------------------------------------------
+
+    chart.title.tx.rich.p[0].r[0].rPr.sz = 1800
+    chart.title.tx.rich.p[0].r[0].rPr.b = True
+
+    # ---------------------------------------------------------
+    # LEGEND
+    #
+    # Put the legend on the RIGHT side.
+    #
+    # Because the chart data uses:
+    #
+    #   Ordered Qty
+    #   Delivered Qty
+    #
+    # as the series headers, the legend will contain
+    # only those two items.
+    # ---------------------------------------------------------
+
+    chart.legend.position = "r"
+
+    # ---------------------------------------------------------
+    # DATA LABELS
+    #
+    # Show the actual quantity on each bar.
+    # ---------------------------------------------------------
 
     chart.dLbls = DataLabelList()
 
     chart.dLbls.showVal = True
+
+    # ---------------------------------------------------------
+    # DATA
+    # ---------------------------------------------------------
 
     data = Reference(
         ws,
@@ -4538,12 +4595,20 @@ def add_supplier_chart(
         max_row=total_row - 1
     )
 
+    # ---------------------------------------------------------
+    # ARTICLE CATEGORIES
+    # ---------------------------------------------------------
+
     categories = Reference(
         ws,
         min_col=1,
         min_row=data_start,
         max_row=total_row - 1
     )
+
+    # ---------------------------------------------------------
+    # ADD DATA
+    # ---------------------------------------------------------
 
     chart.add_data(
         data,
@@ -4555,6 +4620,14 @@ def add_supplier_chart(
     )
 
     # ---------------------------------------------------------
+    # X-AXIS LABELS
+    #
+    # Rotate article names so long names do not overlap.
+    # ---------------------------------------------------------
+
+    chart.x_axis.textRotation = 45
+
+    # ---------------------------------------------------------
     # POSITION CHART
     # ---------------------------------------------------------
 
@@ -4564,7 +4637,6 @@ def add_supplier_chart(
         chart,
         f"A{chart_row}"
     )
-
 # =============================================================================
 # MASTER DASHBOARD
 # =============================================================================
