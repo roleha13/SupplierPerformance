@@ -2347,6 +2347,10 @@ def create_order_summary(
     Article detail rows also use LIVE EXCEL FORMULAS referencing
     the supplier transaction table.
 
+    Delivery Days in the main Order No. Summary rows is calculated
+    directly in Python using the maximum transaction-level
+    Delivery Days for that Purchase Order.
+
     Returns
     -------
     title_row : int
@@ -2645,6 +2649,7 @@ def create_order_summary(
     order_summary_last_data_row = (
         order_summary_first_data_row - 1
     )
+
     # =========================================================================
     # WRITE ONE MAIN ROW PER UNIQUE ORDER
     # =========================================================================
@@ -2784,19 +2789,24 @@ def create_order_summary(
         # ---------------------------------------------------------------------
         # DELIVERY DAYS
         #
-        # LIVE FORMULA:
+        # CALCULATED DIRECTLY IN PYTHON
         #
-        # Returns the highest transaction-level Delivery Days for the current Purchase Order.
-        # 
-        # AGGREGATE(14,6,...,1) returns the largest Delivery Days value for rows where the transaction Order No. matches the current Order No.
-        # This is used instead of MAXIFS because MAXIFS is not supported by the Excel version being used.
-        # IMPORTANT:
-        # The formula references order_reference, which is the exact coordinate of the Order No. cell.
-        # Example:A112 = TML202606-06671
+        # We use the maximum transaction-level Delivery Days
+        # belonging to this Purchase Order.
         #
-        # Formula:=IFERROR(AGGREGATE(14,6,$G$2:$G$92/($D$2:$D$92=A112),1),0)
+        # This avoids the Excel AGGREGATE formula and therefore
+        # avoids the 0.0 cached-result problem.
         #
-        #  Result:   6.0 
+        # Example:
+        #
+        # TML202607-06831 transaction Delivery Days:
+        # 1, 1, 1, 1, 1, 1, 2, 3, 5, 5, 6
+        #
+        # Python calculates:
+        # max(...) = 6
+        #
+        # Excel therefore receives the actual value:
+        # 6.0
         # ---------------------------------------------------------------------
 
         delivery_days_cell = sheet.cell(
@@ -2804,17 +2814,31 @@ def create_order_summary(
             5
         )
 
-        delivery_days_cell.value = (
-            f'=IFERROR('
-            f'AGGREGATE(14,6,'
-            f'${transaction_delivery_days_letter}${transaction_first_data_row}:'
-            f'${transaction_delivery_days_letter}${transaction_last_data_row}/('
-            f'${transaction_order_letter}${transaction_first_data_row}:'
-            f'${transaction_order_letter}${transaction_last_data_row}='
-            f'{order_reference}'
-            f'),1),'
-            f'0'
-            f')'
+        # Get the actual Delivery Days column name from the worksheet header.
+        transaction_delivery_days_header = (
+            sheet.cell(
+                1,
+                transaction_delivery_days_col
+            ).value
+        )
+
+        # Convert the transaction Delivery Days values to numbers.
+        # Any invalid/non-numeric values become NaN and are ignored.
+        delivery_days = pd.to_numeric(
+            order_group[
+                transaction_delivery_days_header
+            ],
+            errors="coerce"
+        ).max()
+
+        # If there is no valid Delivery Days value,
+        # use 0 instead of NaN.
+        if pd.isna(delivery_days):
+            delivery_days = 0
+
+        # Write the calculated Python value directly into Excel.
+        delivery_days_cell.value = float(
+            delivery_days
         )
 
         delivery_days_cell.number_format = "0.0"
